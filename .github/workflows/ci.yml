@@ -1,0 +1,35 @@
+
+name: ClubConnect CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  validate-repository:
+    name: Validate Repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check repository structure
+        run: |
+          echo "ClubConnect CI started"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+          ls -la
+
+      - name: CI configuration verified
+        run: |
+          echo "GitHub Actions is working!"
