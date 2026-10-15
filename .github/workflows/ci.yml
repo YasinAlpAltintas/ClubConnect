@@ -1,16 +1,15 @@
-
 name: ClubConnect CI
 
 on:
   push:
     branches:
-      - main
       - develop
+      - main
 
   pull_request:
     branches:
-      - main
       - develop
+      - main
 
   workflow_dispatch:
 
@@ -18,19 +17,57 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Test GitHub Actions
+  frontend:
+    name: React Build
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Print information
-        run: |
-          echo "ClubConnect CI is working!"
-          echo "Branch: $GITHUB_REF_NAME"
-          echo "Commit: $GITHUB_SHA"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Finish
-        run: echo "All tests passed!"
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check linting
+        run: npm run lint --if-present
+
+      - name: Build React
+        run: npm run build
+
+  backend:
+    name: .NET Build & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: false
+
+      - name: Restore dependencies
+        run: dotnet restore ClubConnect.slnx
+
+      - name: Build backend
+        run: dotnet build ClubConnect.slnx --no-restore --configuration Release
+
+      - name: Run .NET tests
+        run: dotnet test ClubConnect.slnx --no-build --configuration Release

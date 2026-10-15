@@ -1,0 +1,32 @@
+## Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+appsettings.Development.json
+appsettings.Local.json
+
+## Node & Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+## Environment files
+.env
+.env.local
+.env.*.local
+
+## OS Files
+.DS_Store
+Thumbs.db
