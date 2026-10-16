@@ -1,0 +1,55 @@
+
+name: Test GHCR Publishing
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "devops/registry-test/**"
+      - ".github/workflows/test-ghcr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish ARM64 Test Image
+    runs-on: ubuntu-24.04-arm
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image name
+        id: image
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-registry-test" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./devops/registry-test
+          file: ./devops/registry-test/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: >-
+            ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=clubconnect-registry-test
+          cache-to: type=gha,mode=max,scope=clubconnect-registry-test
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
