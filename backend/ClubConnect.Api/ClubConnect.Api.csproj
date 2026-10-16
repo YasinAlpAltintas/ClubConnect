@@ -10,4 +10,10 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ClubConnect.Application\ClubConnect.Application.csproj" />
+    <ProjectReference Include="..\ClubConnect.Domain\ClubConnect.Domain.csproj" />
+    <ProjectReference Include="..\ClubConnect.Infrastructure\ClubConnect.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
