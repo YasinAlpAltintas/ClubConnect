@@ -1,0 +1,52 @@
+# Isolated environment for local development and integration/e2e testing.
+# NOT used for production deployment.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: clubconnect-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clubconnect
+      POSTGRES_USER: clubconnect
+      POSTGRES_PASSWORD: clubconnect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clubconnect -d clubconnect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clubconnect-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=clubconnect;Username=clubconnect;Password=clubconnect"
+      ClubConnect__Cors__AllowedOrigins__0: "http://localhost:5173"
+      ClubConnect__Cors__AllowedOrigins__1: "http://localhost:80"
+      ClubConnect__Cors__AllowedOrigins__2: "http://frontend"
+    ports:
+      - "5069:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: clubconnect-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:

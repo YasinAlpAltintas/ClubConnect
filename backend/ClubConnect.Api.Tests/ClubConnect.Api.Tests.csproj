@@ -6,6 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <ThresholdStat>line</ThresholdStat>
+    <Threshold>75</Threshold>
+    <ThresholdType>minimum</ThresholdType>
+    <ThresholdParent>module</ThresholdParent>
+    <Exclude>[*]Microsoft.AspNetCore.OpenApi.*,[*]System.Runtime.CompilerServices.*OpenApi*</Exclude>
+    <ExcludeByFile>**/obj/**/*.cs,**/*.generated.cs</ExcludeByFile>
+    <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
   </PropertyGroup>
 
   <ItemGroup>
