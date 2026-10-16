@@ -1,3 +1,4 @@
+
 name: ClubConnect CI
 
 on:
@@ -17,6 +18,9 @@ permissions:
   contents: read
 
 jobs:
+  # ==========================================
+  # 1. FRONTEND - REACT
+  # ==========================================
   frontend:
     name: React Build
     runs-on: ubuntu-latest
@@ -45,6 +49,9 @@ jobs:
       - name: Build React
         run: npm run build
 
+  # ==========================================
+  # 2. BACKEND - ASP.NET CORE 10
+  # ==========================================
   backend:
     name: .NET Build & Test
     runs-on: ubuntu-latest
@@ -71,3 +78,78 @@ jobs:
 
       - name: Run .NET tests
         run: dotnet test ClubConnect.slnx --no-build --configuration Release
+
+  # ==========================================
+  # 3. NON-PROD - DOCKER COMPOSE TEST
+  # ==========================================
+  staging-compose-test:
+    name: Staging Compose Test
+    runs-on: ubuntu-latest
+
+    needs:
+      - frontend
+      - backend
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+
+    environment: staging
+
+    concurrency:
+      group: clubconnect-staging
+      cancel-in-progress: false
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          install -m 700 -d ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Test Docker Compose on NON-PROD
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'bash -se' <<'REMOTE'
+          set -euo pipefail
+
+          cd /opt/clubconnect
+
+          echo "Validating Docker Compose..."
+          docker compose -f compose.test.yml config --quiet
+
+          echo "Running registry test container..."
+          output=$(docker compose -f compose.test.yml run --rm registry-test 2>&1)
+
+          printf '%s\n' "$output"
+
+          echo "Verifying result..."
+          grep -Fq \
+            'ClubConnect GHCR test successful!' \
+            <<< "$output"
+
+          echo "Staging Compose test passed!"
+          REMOTE
+
+      - name: Deployment verification complete
+        run: |
+          echo "GitHub Actions successfully connected to NON-PROD."
+          echo "Docker Compose verification passed."
