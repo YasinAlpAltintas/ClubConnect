@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "ClubConnect",
+    "tagline": "De plek waar studentclubs hun volgende lid vinden."
+  },
+  "header": {
+    "language": "Taal",
+    "languageToggle": "English"
+  },
+  "register": {
+    "title": "Maak een account aan",
+    "subtitle": "Word lid van ClubConnect en maak kennis met studentenclubs.",
+    "email": "E-mailadres",
+    "emailPlaceholder": "jij@voorbeeld.be",
+    "password": "Wachtwoord",
+    "submit": "Account aanmaken",
+    "submitting": "Account wordt aangemaakt…",
+    "errors": {
+      "required": "Dit veld is verplicht.",
+      "email_invalid": "Vul een geldig e-mailadres in.",
+      "password_min": "Het wachtwoord moet minstens {{min}} tekens bevatten.",
+      "password_letter": "Het wachtwoord moet minstens één letter bevatten.",
+      "password_digit": "Het wachtwoord moet minstens één cijfer bevatten."
+    },
+    "api": {
+      "conflict": "Er bestaat al een account met dit e-mailadres.",
+      "invalid_email": "Vul een geldig e-mailadres in.",
+      "invalid_password": "Controleer je wachtwoord en probeer opnieuw.",
+      "network": "Er ging iets mis. Probeer het nog eens.",
+      "unexpected": "Onverwacht antwoord ({{status}})."
+    }
+  },
+  "success": {
+    "title": "Account aangemaakt",
+    "message": "Welkom bij ClubConnect, {{email}}. Je account staat klaar."
+  }
+}

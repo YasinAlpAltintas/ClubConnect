@@ -1,3 +1,7 @@
 <Solution>
+  <Project Path="ClubConnect.Domain/ClubConnect.Domain.csproj" />
+  <Project Path="ClubConnect.Application/ClubConnect.Application.csproj" />
+  <Project Path="ClubConnect.Infrastructure/ClubConnect.Infrastructure.csproj" />
   <Project Path="ClubConnect.Api/ClubConnect.Api.csproj" />
+  <Project Path="ClubConnect.Api.Tests/ClubConnect.Api.Tests.csproj" />
 </Solution>
