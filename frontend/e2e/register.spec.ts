@@ -6,7 +6,7 @@ test.describe('Member Registration Flow', () => {
   })
 
   test('successfully registers a new club member account', async ({ page }) => {
-    const uniqueEmail = `member-${Date.now()}@example.com`
+    const uniqueEmail = `member-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
     const validPassword = 'Passw0rd123!'
 
     await page.fill('#email', uniqueEmail)
@@ -18,18 +18,26 @@ test.describe('Member Registration Flow', () => {
     await expect(page.locator('p')).toContainText(uniqueEmail)
   })
 
-  test('displays validation errors on invalid input', async ({ page }) => {
+  test('displays validation errors on invalid input (client-side and API 400)', async ({ page, request }) => {
+    // 1. UI validation check
     await page.fill('#email', 'invalid-email-format')
     await page.fill('#password', '123')
     await page.click('button[type="submit"]')
 
-    // Client-side schema error feedback should be visible
     await expect(page.locator('#email-error')).toBeVisible()
     await expect(page.locator('#password-error')).toBeVisible()
+
+    // 2. Direct backend API contract validation (400 Bad Request)
+    const apiResponse = await request.post('/api/auth/register', {
+      data: { email: 'not-an-email', password: '123' },
+    })
+    expect(apiResponse.status()).toBe(400)
+    const errorBody = await apiResponse.json()
+    expect(errorBody.error).toBe('invalid_input')
   })
 
-  test('displays conflict error when registering duplicate email', async ({ page }) => {
-    const duplicateEmail = `duplicate-${Date.now()}@example.com`
+  test('displays conflict error when registering duplicate email (409 Conflict)', async ({ page }) => {
+    const duplicateEmail = `duplicate-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
     const validPassword = 'Passw0rd123!'
 
     // First registration

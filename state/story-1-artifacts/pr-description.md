@@ -50,9 +50,9 @@ This PR delivers the end-to-end vertical slice for **INC-5 (Story 1)**, enabling
 ### 3. End-to-End (Playwright)
 - **Suite:** `frontend/e2e/register.spec.ts`
 - **Scenarios covered:**
-  1. `successfully registers a new club member account` (Verifies positive registration flow and welcome confirmation)
-  2. `displays validation errors on invalid input` (Verifies client-side validation triggers for email and password)
-  3. `displays conflict error when registering duplicate email` (Verifies server-side 409 conflict banner presentation)
+  1. `successfully registers a new club member account` (Verifies positive registration flow, unique test data generation, and welcome confirmation)
+  2. `displays validation errors on invalid input (client-side and API 400)` (Verifies client-side validation triggers and directly validates backend 400 Bad Request contract)
+  3. `displays conflict error when registering duplicate email (409 Conflict)` (Verifies server-side 409 conflict banner presentation on existing email submission)
 
 ---
 
@@ -62,11 +62,12 @@ This PR delivers the end-to-end vertical slice for **INC-5 (Story 1)**, enabling
   - `backend/ClubConnect.Api.Tests/ClubConnect.Api.Tests.csproj`: Corrected Coverlet exclusion configuration (`Exclude`, `ExcludeByFile`, `ExcludeByAttribute`) to cleanly separate Roslyn OpenAPI generator output without touching application logic.
   - `backend/ClubConnect.Api.Tests/AuthControllerTests.cs`: Added direct unit tests covering `AuthController` registration and EF Core unique-constraint race condition handling.
 - **Frontend & E2E:**
-  - `frontend/playwright.config.ts`: Configured isolated Playwright runner with Vite webServer and Chromium support.
-  - `frontend/e2e/register.spec.ts`: Implemented end-to-end registration flow tests.
+  - `frontend/vite.config.ts`: Updated proxy target to `process.env.VITE_API_URL || 'http://127.0.0.1:5069'` to eliminate IPv6 DNS lookup failures (`AggregateError [ECONNREFUSED]`).
+  - `frontend/playwright.config.ts`: Configured Playwright runner to manage both ASP.NET Core API and Vite dev server with health checks (`reuseExistingServer: true`).
+  - `frontend/e2e/register.spec.ts`: Implemented end-to-end registration flow tests with randomized unique emails and 201/400/409 coverage.
 - **Environment & Infrastructure:**
   - `docker-compose.yml`: Added standalone PostgreSQL 17 test environment configuration for isolated local testing.
-  - `.github/workflows/ci.yml`: Updated CI pipeline to enforce frontend coverage (Vitest), backend coverage (Coverlet), and Playwright E2E execution with PostgreSQL service container, while preserving existing ARM64 builds, GHCR publishing, and staging SSH verification.
+  - `.github/workflows/ci.yml`: Updated CI pipeline with unified backend lifecycle and bounded health check (`/health`), enforcing frontend coverage (Vitest), backend coverage (Coverlet), and Playwright E2E execution with PostgreSQL service container, while preserving existing ARM64 builds, GHCR publishing, and staging SSH verification.
 
 ---
 

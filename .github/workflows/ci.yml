@@ -106,7 +106,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U clubconnect -d clubconnect"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -136,25 +136,54 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Start backend API
+      - name: Start backend API & Run Playwright E2E tests
+        working-directory: frontend
         env:
           ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__Default: Host=localhost;Port=5432;Database=clubconnect;Username=clubconnect;Password=clubconnect
+          ConnectionStrings__Default: Host=127.0.0.1;Port=5432;Database=clubconnect;Username=clubconnect;Password=clubconnect
           ClubConnect__Cors__AllowedOrigins__0: http://localhost:5173
+          ClubConnect__Cors__AllowedOrigins__1: http://127.0.0.1:5173
+          VITE_API_URL: http://127.0.0.1:5069
         run: |
-          dotnet run --project backend/ClubConnect.Api --configuration Release --urls http://localhost:5069 &
-          for i in {1..30}; do
-            if curl -s http://localhost:5069/health | grep -q "Healthy"; then
-              echo "Backend is healthy!"
+          echo "Starting backend API in background..."
+          dotnet run --project ../backend/ClubConnect.Api --configuration Release --urls "http://127.0.0.1:5069;http://localhost:5069" > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
+
+          echo "Waiting for backend API readiness at http://127.0.0.1:5069/health..."
+          READY=0
+          for i in $(seq 1 30); do
+            if curl -s -f http://127.0.0.1:5069/health | grep -q "Healthy"; then
+              echo "Backend API is ready and healthy!"
+              READY=1
               break
             fi
-            echo "Waiting for backend..."
+            echo "Attempt $i/30: backend not ready yet, sleeping 1s..."
             sleep 1
           done
 
-      - name: Run Playwright E2E tests
-        working-directory: frontend
-        run: npm run test:e2e
+          if [ $READY -ne 1 ]; then
+            echo "Error: Backend API failed to become ready within 30 seconds."
+            echo "=== Backend logs ==="
+            cat /tmp/backend.log || true
+            echo "===================="
+            kill $BACKEND_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Running Playwright E2E tests..."
+          npm run test:e2e
+          TEST_EXIT_CODE=$?
+
+          echo "Cleaning up backend API process ($BACKEND_PID)..."
+          kill $BACKEND_PID 2>/dev/null || true
+
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "=== Backend logs (post-test failure) ==="
+            cat /tmp/backend.log || true
+            echo "========================================"
+          fi
+
+          exit $TEST_EXIT_CODE
 
       - name: Upload Playwright test results
         if: failure()

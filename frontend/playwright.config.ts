@@ -18,12 +18,18 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER
-    ? undefined
-    : {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
-        reuseExistingServer: !process.env.CI,
-        timeout: 120000,
-      },
+  webServer: [
+    {
+      command: 'dotnet run --project ../backend/ClubConnect.Api --configuration Release --urls "http://127.0.0.1:5069;http://localhost:5069"',
+      url: 'http://127.0.0.1:5069/health',
+      reuseExistingServer: true,
+      timeout: 60000,
+    },
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: true,
+      timeout: 60000,
+    },
+  ],
 })
