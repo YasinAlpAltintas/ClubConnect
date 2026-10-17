@@ -11,8 +11,8 @@
     <Threshold>75</Threshold>
     <ThresholdType>minimum</ThresholdType>
     <ThresholdParent>module</ThresholdParent>
-    <Exclude>[*]Microsoft.AspNetCore.OpenApi.*,[*]System.Runtime.CompilerServices.*OpenApi*</Exclude>
-    <ExcludeByFile>**/obj/**/*.cs,**/*.generated.cs</ExcludeByFile>
+    <Exclude>[*]Microsoft.AspNetCore.OpenApi.*,[*]System.Runtime.CompilerServices.*OpenApi*,[*]ClubConnect.Infrastructure.Persistence.Migrations.*</Exclude>
+    <ExcludeByFile>**/obj/**/*.cs,**/*.generated.cs,**/Migrations/**/*.cs</ExcludeByFile>
     <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
   </PropertyGroup>
 

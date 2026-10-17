@@ -149,6 +149,9 @@ jobs:
           ss -lptn 'sport = :5069' || true
           lsof -i :5069 || true
 
+          echo "Applying database migrations to disposable PostgreSQL test database..."
+          dotnet run --project ../backend/ClubConnect.Api --configuration Release --no-launch-profile -- --migrate
+
           echo "Starting backend API in background..."
           dotnet run --project ../backend/ClubConnect.Api --configuration Release --no-launch-profile --urls "http://127.0.0.1:5069" > /tmp/backend.log 2>&1 &
           BACKEND_PID=$!

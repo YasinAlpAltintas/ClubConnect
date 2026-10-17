@@ -1,6 +1,7 @@
 using ClubConnect.Application;
 using ClubConnect.Infrastructure;
 using ClubConnect.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,15 +22,17 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(policy =>
 
 var app = builder.Build();
 
+if (args.Contains("--migrate"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<ClubConnectDbContext>();
+    await db.Database.MigrateAsync();
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-
-    // No EF Core migrations are committed yet. For this local vertical slice we
-    // create the schema on startup; real migrations ship with a later story.
-    await using var scope = app.Services.CreateAsyncScope();
-    var db = scope.ServiceProvider.GetRequiredService<ClubConnectDbContext>();
-    await db.Database.EnsureCreatedAsync();
 }
 
 app.UseCors();
