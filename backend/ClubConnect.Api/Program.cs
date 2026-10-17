@@ -27,7 +27,8 @@ if (app.Environment.IsDevelopment())
 
     // No EF Core migrations are committed yet. For this local vertical slice we
     // create the schema on startup; real migrations ship with a later story.
-    var db = app.Services.GetRequiredService<ClubConnectDbContext>();
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<ClubConnectDbContext>();
     await db.Database.EnsureCreatedAsync();
 }
 

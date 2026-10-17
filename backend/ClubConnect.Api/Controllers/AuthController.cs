@@ -37,7 +37,7 @@ public class AuthController(RegisterMemberUseCase registerMemberUseCase) : Contr
         {
             Email = request.Email ?? string.Empty,
             Password = request.Password ?? string.Empty,
-            DisplayName = request.DisplayName,
+            DisplayName = request.DisplayName ?? string.Empty,
         };
 
         var outcome = await SafeRegisterAsync(command, cancellationToken).ConfigureAwait(false);

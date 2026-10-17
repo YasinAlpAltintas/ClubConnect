@@ -20,7 +20,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'dotnet run --project ../backend/ClubConnect.Api --configuration Release --urls "http://127.0.0.1:5069;http://localhost:5069"',
+      command: 'dotnet run --project ../backend/ClubConnect.Api --configuration Release --no-launch-profile --urls "http://127.0.0.1:5069;http://localhost:5069"',
       url: 'http://127.0.0.1:5069/health',
       reuseExistingServer: true,
       timeout: 60000,

@@ -146,7 +146,7 @@ jobs:
           VITE_API_URL: http://127.0.0.1:5069
         run: |
           echo "Starting backend API in background..."
-          dotnet run --project ../backend/ClubConnect.Api --configuration Release --urls "http://127.0.0.1:5069;http://localhost:5069" > /tmp/backend.log 2>&1 &
+          dotnet run --project ../backend/ClubConnect.Api --configuration Release --no-launch-profile --urls "http://127.0.0.1:5069;http://localhost:5069" > /tmp/backend.log 2>&1 &
           BACKEND_PID=$!
 
           echo "Waiting for backend API readiness at http://127.0.0.1:5069/health..."
