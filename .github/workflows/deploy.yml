@@ -228,7 +228,7 @@ jobs:
 
           echo "Inspecting frontend image: $FRONTEND_IMAGE..."
           frontend_inspect=$(docker buildx imagetools inspect "$FRONTEND_IMAGE" 2>&1 || true)
-          if ! grep -q "Digest: sha256:" <<< "$frontend_inspect"; then
+          if ! grep -Eq 'Digest:[[:space:]]+sha256:[a-f0-9]{64}' <<< "$frontend_inspect"; then
             echo "::error::Frontend image $FRONTEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
@@ -236,7 +236,7 @@ jobs:
 
           echo "Inspecting backend image: $BACKEND_IMAGE..."
           backend_inspect=$(docker buildx imagetools inspect "$BACKEND_IMAGE" 2>&1 || true)
-          if ! grep -q "Digest: sha256:" <<< "$backend_inspect"; then
+          if ! grep -Eq 'Digest:[[:space:]]+sha256:[a-f0-9]{64}' <<< "$backend_inspect"; then
             echo "::error::Backend image $BACKEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
