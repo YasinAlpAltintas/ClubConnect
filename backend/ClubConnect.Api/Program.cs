@@ -1,0 +1,48 @@
+using ClubConnect.Application;
+using ClubConnect.Infrastructure;
+using ClubConnect.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+var allowedOrigins = builder.Configuration
+    .GetSection("ClubConnect:Cors:AllowedOrigins").Get<string[]>()
+    ?? [];
+
+builder.Services.AddCors(o => o.AddDefaultPolicy(policy =>
+{
+    if (allowedOrigins.Length > 0)
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+}));
+
+var app = builder.Build();
+
+if (args.Contains("--migrate"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<ClubConnectDbContext>();
+    await db.Database.MigrateAsync();
+    return;
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.UseCors();
+app.UseHttpsRedirection();
+app.UseRouting();
+
+app.MapHealthChecks("/health");
+app.MapControllers();
+
+app.Run();
+
+// Exposed for WebApplicationFactory-based integration tests.
+public partial class Program { }

@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "ClubConnect",
+    "tagline": "Where student clubs find their next great member."
+  },
+  "header": {
+    "language": "Language",
+    "languageToggle": "Nederlands"
+  },
+  "register": {
+    "title": "Create your account",
+    "subtitle": "Join ClubConnect to connect with student clubs.",
+    "email": "E-mail address",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "submit": "Create account",
+    "submitting": "Creating account…",
+    "errors": {
+      "required": "This field is required.",
+      "email_invalid": "Enter a valid e-mail address.",
+      "password_min": "Password must be at least {{min}} characters long.",
+      "password_letter": "Password must contain at least one letter.",
+      "password_digit": "Password must contain at least one digit."
+    },
+    "api": {
+      "conflict": "An account with this e-mail already exists.",
+      "invalid_email": "Enter a valid e-mail address.",
+      "invalid_password": "Check your password and try again.",
+      "network": "Something went wrong. Please try again.",
+      "unexpected": "Unexpected response ({{status}})."
+    }
+  },
+  "success": {
+    "title": "Account created",
+    "message": "Welcome to ClubConnect, {{email}}. Your account is ready."
+  }
+}
