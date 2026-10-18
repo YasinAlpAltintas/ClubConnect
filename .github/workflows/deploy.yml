@@ -232,7 +232,7 @@ jobs:
             echo "::error::Frontend image $FRONTEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
-          frontend_digest=$(grep -m1 "Digest: sha256:" <<< "$frontend_inspect" | awk '{print $2}')
+          frontend_digest=$(awk '$1 == "Digest:" {print $2; exit}' <<< "$frontend_inspect")
 
           echo "Inspecting backend image: $BACKEND_IMAGE..."
           backend_inspect=$(docker buildx imagetools inspect "$BACKEND_IMAGE" 2>&1 || true)
@@ -240,7 +240,7 @@ jobs:
             echo "::error::Backend image $BACKEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
-          backend_digest=$(grep -m1 "Digest: sha256:" <<< "$backend_inspect" | awk '{print $2}')
+          backend_digest=$(awk '$1 == "Digest:" {print $2; exit}' <<< "$backend_inspect")
 
           echo "frontend_digest=${frontend_digest}" >> "$GITHUB_OUTPUT"
           echo "backend_digest=${backend_digest}" >> "$GITHUB_OUTPUT"
