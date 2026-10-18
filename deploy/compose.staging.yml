@@ -6,7 +6,6 @@ name: clubconnect-staging
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: clubconnect-staging-postgres
     restart: unless-stopped
     env_file:
       - ${CONFIG_FILE}
@@ -30,7 +29,6 @@ services:
 
   api:
     image: ${API_IMAGE}
-    container_name: clubconnect-staging-api
     restart: unless-stopped
     env_file:
       - ${CONFIG_FILE}
@@ -50,7 +48,6 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE}
-    container_name: clubconnect-staging-frontend
     restart: unless-stopped
     ports:
       - "127.0.0.1:8088:80"
