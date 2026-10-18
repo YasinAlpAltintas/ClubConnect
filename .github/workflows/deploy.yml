@@ -407,7 +407,8 @@ jobs:
             exit 1
           fi
           echo "Production manual confirmation input validated."
-
+      - name: Checkout deployment repository
+        uses: actions/checkout@v4
       - name: Retrieve & Verify Staging Evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
