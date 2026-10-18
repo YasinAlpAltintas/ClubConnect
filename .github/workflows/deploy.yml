@@ -130,28 +130,90 @@ jobs:
           COMMIT_SHA: ${{ steps.validate.outputs.commit_sha }}
         run: |
           set -euo pipefail
-          echo "Verifying CI check-runs for commit $COMMIT_SHA..."
 
-          checks_json=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/check-runs" || true)
-          total_count=$(jq -r '.total_count // 0' <<< "$checks_json")
+          echo "Verifying trusted CI workflow run for commit $COMMIT_SHA..."
 
-          if [ "$total_count" -gt 0 ]; then
-            failed_checks=$(jq -r '.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped") | .name' <<< "$checks_json")
-            if [ -n "$failed_checks" ]; then
-              echo "::error::Commit $COMMIT_SHA failed required CI checks:" >&2
-              echo "$failed_checks" >&2
-              exit 1
-            fi
-            echo "All CI check-runs concluded successfully."
-          else
-            status_json=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/status" || true)
-            status_state=$(jq -r '.state // "unknown"' <<< "$status_json")
-            if [ "$status_state" = "failure" ] || [ "$status_state" = "error" ]; then
-              echo "::error::Commit $COMMIT_SHA combined status is '$status_state'." >&2
-              exit 1
-            fi
-            echo "Combined commit status: $status_state"
+          # 1. Verify trusted CI workflow run (fail-closed, no API error suppression)
+          workflow_runs_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${COMMIT_SHA}")
+          ci_runs=$(jq '[.workflow_runs[]? | select(.name == "ClubConnect CI" or .path == ".github/workflows/ci.yml")]' <<< "$workflow_runs_json")
+          ci_run_count=$(jq 'length' <<< "$ci_runs")
+
+          if [ "$ci_run_count" -eq 0 ]; then
+            echo "::error::No completed 'ClubConnect CI' workflow run found for commit $COMMIT_SHA. Deployments require verified CI completion." >&2
+            exit 1
           fi
+
+          latest_status=$(jq -r '.[0].status // empty' <<< "$ci_runs")
+          latest_conclusion=$(jq -r '.[0].conclusion // empty' <<< "$ci_runs")
+          latest_run_id=$(jq -r '.[0].id // empty' <<< "$ci_runs")
+
+          echo "Found ClubConnect CI run ID $latest_run_id: status='$latest_status', conclusion='$latest_conclusion'"
+
+          if [ "$latest_status" != "completed" ]; then
+            echo "::error::ClubConnect CI workflow run $latest_run_id is not completed (current status: '$latest_status')." >&2
+            exit 1
+          fi
+
+          if [ "$latest_conclusion" != "success" ]; then
+            echo "::error::ClubConnect CI workflow run $latest_run_id did not succeed (conclusion: '$latest_conclusion')." >&2
+            exit 1
+          fi
+
+          # 2. Retrieve all check-runs across pages (fail-closed, no API error suppression)
+          echo "Retrieving all check-runs for commit $COMMIT_SHA with pagination..."
+          all_check_runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/check-runs" | jq -s '[.[].check_runs[]?]')
+          total_checks=$(jq 'length' <<< "$all_check_runs")
+
+          if [ "$total_checks" -eq 0 ]; then
+            echo "::error::No check-runs returned for commit $COMMIT_SHA. Failing closed." >&2
+            exit 1
+          fi
+          echo "Retrieved $total_checks check-run(s) across all pages."
+
+          # 3. Explicitly verify every required CI job completed successfully
+          # Required jobs from ClubConnect CI: React Build, .NET Build & Test, Playwright E2E Tests, Docker ARM64 Build
+          REQUIRED_CHECKS=(
+            "React Build|frontend"
+            ".NET Build & Test|backend"
+            "Playwright E2E Tests|e2e"
+            "Docker ARM64 Build|docker-build"
+          )
+
+          for check_pattern in "${REQUIRED_CHECKS[@]}"; do
+            matching=$(jq -c --arg pat "$check_pattern" '[.[] | select(.name | test($pat))]' <<< "$all_check_runs")
+            match_count=$(jq 'length' <<< "$matching")
+
+            if [ "$match_count" -eq 0 ]; then
+              echo "::error::Required CI check matching '${check_pattern}' is MISSING for commit $COMMIT_SHA." >&2
+              exit 1
+            fi
+
+            check_name=$(jq -r '.[-1].name // empty' <<< "$matching")
+            check_status=$(jq -r '.[-1].status // empty' <<< "$matching")
+            check_conclusion=$(jq -r '.[-1].conclusion // empty' <<< "$matching")
+
+            echo "Verifying required check '${check_name}': status='${check_status}', conclusion='${check_conclusion}'"
+
+            if [ "$check_status" != "completed" ]; then
+              echo "::error::Required CI check '${check_name}' is not completed (current status: '${check_status}')." >&2
+              exit 1
+            fi
+
+            if [ "$check_conclusion" != "success" ]; then
+              echo "::error::Required CI check '${check_name}' concluded with '${check_conclusion}' (expected 'success'). Skipped, cancelled, and failed checks are rejected." >&2
+              exit 1
+            fi
+          done
+
+          # 4. Reject if any CI check run on this commit is failed, cancelled, timed out, or still pending
+          disallowed_checks=$(jq -r '.[] | select((.name | test("Validate Release|ClubConnect Deploy") | not) and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .status != "completed")) | "\(.name) (status: \(.status), conclusion: \(.conclusion))"' <<< "$all_check_runs")
+          if [ -n "$disallowed_checks" ]; then
+            echo "::error::Commit $COMMIT_SHA has unsuccessful or unfinished CI checks:" >&2
+            echo "$disallowed_checks" >&2
+            exit 1
+          fi
+
+          echo "All required CI jobs verified successfully and fail-closed checks passed."
 
       - name: Verify Container Images Exist on GHCR
         id: inspect-images
@@ -166,19 +228,19 @@ jobs:
 
           echo "Inspecting frontend image: $FRONTEND_IMAGE..."
           frontend_inspect=$(docker buildx imagetools inspect "$FRONTEND_IMAGE" 2>&1 || true)
-          if ! grep -q "Digest: sha256:" <<< "$frontend_inspect"; then
+          if ! grep -Eq 'Digest:[[:space:]]+sha256:[a-f0-9]{64}' <<< "$frontend_inspect"; then
             echo "::error::Frontend image $FRONTEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
-          frontend_digest=$(grep -m1 "Digest: sha256:" <<< "$frontend_inspect" | awk '{print $2}')
+          frontend_digest=$(awk '$1 == "Digest:" {print $2; exit}' <<< "$frontend_inspect")
 
           echo "Inspecting backend image: $BACKEND_IMAGE..."
           backend_inspect=$(docker buildx imagetools inspect "$BACKEND_IMAGE" 2>&1 || true)
-          if ! grep -q "Digest: sha256:" <<< "$backend_inspect"; then
+          if ! grep -Eq 'Digest:[[:space:]]+sha256:[a-f0-9]{64}' <<< "$backend_inspect"; then
             echo "::error::Backend image $BACKEND_IMAGE not found on GHCR." >&2
             exit 1
           fi
-          backend_digest=$(grep -m1 "Digest: sha256:" <<< "$backend_inspect" | awk '{print $2}')
+          backend_digest=$(awk '$1 == "Digest:" {print $2; exit}' <<< "$backend_inspect")
 
           echo "frontend_digest=${frontend_digest}" >> "$GITHUB_OUTPUT"
           echo "backend_digest=${backend_digest}" >> "$GITHUB_OUTPUT"
@@ -210,10 +272,10 @@ jobs:
           fi
           echo "All required staging secrets verified present."
 
-      - name: Checkout target commit
+      - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.commit_sha }}
+          ref: main
 
       - name: Configure SSH credentials
         env:
@@ -405,10 +467,10 @@ jobs:
           echo "STAGING_FRONTEND_DIGEST=${stg_frontend_digest}" >> "$GITHUB_ENV"
           echo "STAGING_BACKEND_DIGEST=${stg_backend_digest}" >> "$GITHUB_ENV"
 
-      - name: Checkout target commit
+      - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.commit_sha }}
+          ref: main
 
       - name: Configure SSH credentials
         env:

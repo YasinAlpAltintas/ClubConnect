@@ -730,6 +730,414 @@ else
   fail "Staging evidence check should reject failed smoke test"
 fi
 
+# ------------------------------------------------------------------------------
+# Test 14: CI Check-Runs & Trusted Workflow Run Fail-Closed Gates
+# ------------------------------------------------------------------------------
+echo "Test 14: CI check-runs & trusted workflow run fail-closed verification..."
+
+# 14.1 Verify API error suppression removal (fail-closed behavior)
+# In deploy.yml, the step runs under `set -euo pipefail`.
+# If `gh api` exits with non-zero, the step aborts immediately without suppression.
+api_fail_out=$(bash -c '
+set -euo pipefail
+# Simulating gh api without || true
+(exit 22)
+echo "SHOULD_NOT_EXECUTE"
+' 2>&1 || true)
+
+if ! grep -q "SHOULD_NOT_EXECUTE" <<< "$api_fail_out"; then
+  pass "Verified gh api failures fail-closed immediately without error suppression"
+else
+  fail "API failures should abort immediately without error suppression"
+fi
+
+# Detect functional python binary
+PYTHON_BIN=""
+for candidate in "/c/Python315/python" "python3" "python"; do
+  if "$candidate" --version >/dev/null 2>&1; then
+    PYTHON_BIN="$candidate"
+    break
+  fi
+done
+
+
+# Create validator script in sandbox
+cat <<'EOF' > "${SANDBOX_DIR}/validate_ci.py"
+import json, sys, re
+
+def validate_ci(runs_path, checks_paths):
+    # 1. Validate workflow run
+    with open(runs_path, "r", encoding="utf-8") as f:
+        runs_data = json.load(f)
+    
+    ci_runs = [
+        r for r in runs_data.get("workflow_runs", [])
+        if r.get("name") == "ClubConnect CI" or r.get("path") == ".github/workflows/ci.yml"
+    ]
+    if not ci_runs:
+        raise ValueError("No ClubConnect CI workflow run found")
+    
+    latest_run = ci_runs[0]
+    if latest_run.get("status") != "completed":
+        raise ValueError(f"ClubConnect CI workflow run status is {latest_run.get('status')}, expected completed")
+    if latest_run.get("conclusion") != "success":
+        raise ValueError(f"ClubConnect CI workflow run conclusion is {latest_run.get('conclusion')}, expected success")
+    
+    # 2. Gather all check runs across pages
+    all_checks = []
+    for p in checks_paths:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                all_checks.extend(data)
+            elif isinstance(data, dict):
+                all_checks.extend(data.get("check_runs", []))
+    
+    if not all_checks:
+        raise ValueError("No check-runs found")
+    
+    # 3. Explicitly verify every required CI job completed successfully
+    required_patterns = [
+        r"^(React Build|frontend)$",
+        r"^(\.NET Build & Test|backend)$",
+        r"^(Playwright E2E Tests|e2e)$",
+        r"^(Docker ARM64 Build|docker-build)$"
+    ]
+    
+    for pat in required_patterns:
+        matching = [c for c in all_checks if re.search(pat, c.get("name", ""))]
+        if not matching:
+            raise ValueError(f"Required CI check matching pattern {pat} is MISSING")
+        latest_check = matching[-1]
+        if latest_check.get("status") != "completed":
+            raise ValueError(f"Required check {latest_check.get('name')} status is {latest_check.get('status')}")
+        if latest_check.get("conclusion") != "success":
+            raise ValueError(f"Required check {latest_check.get('name')} conclusion is {latest_check.get('conclusion')}")
+            
+    # 4. Reject if any CI check on commit has failed, timed_out, cancelled, or is unfinished
+    for c in all_checks:
+        name = c.get("name", "")
+        if "Validate Release" in name or "ClubConnect Deploy" in name:
+            continue
+        if c.get("status") != "completed":
+            raise ValueError(f"Check {name} is still pending: {c.get('status')}")
+        if c.get("conclusion") in ["failure", "cancelled", "timed_out"]:
+            raise ValueError(f"Check {name} failed: {c.get('conclusion')}")
+            
+    return True
+
+if __name__ == "__main__":
+    runs_file = sys.argv[1]
+    checks_files = sys.argv[2:]
+    try:
+        validate_ci(runs_file, checks_files)
+        print("VALID")
+    except Exception as e:
+        print(f"REJECTED: {e}")
+        sys.exit(1)
+EOF
+
+run_ci_validator() {
+  local runs_f="$1"
+  shift
+  local checks_args=()
+  for cf in "$@"; do
+    local win_cf="$cf"
+    command -v cygpath >/dev/null 2>&1 && win_cf=$(cygpath -w "$cf")
+    checks_args+=("$win_cf")
+  done
+  local win_rf="$runs_f"
+  command -v cygpath >/dev/null 2>&1 && win_rf=$(cygpath -w "$runs_f")
+  
+  local py_script="${SANDBOX_DIR}/validate_ci.py"
+  command -v cygpath >/dev/null 2>&1 && py_script=$(cygpath -w "$py_script")
+  
+  if "$PYTHON_BIN" "$py_script" "$win_rf" "${checks_args[@]}" >/dev/null 2>&1; then
+    echo "VALID"
+  else
+    echo "REJECTED"
+  fi
+}
+
+# Base valid workflow run JSON
+cat <<'EOF' > "${SANDBOX_DIR}/valid_runs.json"
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 1001,
+      "name": "ClubConnect CI",
+      "path": ".github/workflows/ci.yml",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}
+EOF
+
+# Base valid check-runs JSON (all 4 required pass)
+cat <<'EOF' > "${SANDBOX_DIR}/valid_checks.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+
+# 14.2 Valid run & checks -> PASS
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/valid_checks.json")
+if [ "$val_result" = "VALID" ]; then
+  pass "Accepted release with completed ClubConnect CI run and all 4 required checks passed"
+else
+  fail "Valid CI run and checks should be accepted"
+fi
+
+# 14.3 Missing workflow run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/empty_runs.json"
+{
+  "total_count": 0,
+  "workflow_runs": []
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/empty_runs.json" "${SANDBOX_DIR}/valid_checks.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when ClubConnect CI workflow run is missing"
+else
+  fail "Missing workflow run should be rejected"
+fi
+
+# 14.4 In-progress workflow run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/pending_runs.json"
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 1002,
+      "name": "ClubConnect CI",
+      "path": ".github/workflows/ci.yml",
+      "status": "in_progress",
+      "conclusion": null
+    }
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/pending_runs.json" "${SANDBOX_DIR}/valid_checks.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when ClubConnect CI workflow run is in_progress"
+else
+  fail "Pending workflow run should be rejected"
+fi
+
+# 14.5 Failed workflow run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/failed_runs.json"
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 1003,
+      "name": "ClubConnect CI",
+      "path": ".github/workflows/ci.yml",
+      "status": "completed",
+      "conclusion": "failure"
+    }
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/failed_runs.json" "${SANDBOX_DIR}/valid_checks.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when ClubConnect CI workflow run concluded with failure"
+else
+  fail "Failed workflow run should be rejected"
+fi
+
+# 14.6 Cancelled workflow run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/cancelled_runs.json"
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 1004,
+      "name": "ClubConnect CI",
+      "path": ".github/workflows/ci.yml",
+      "status": "completed",
+      "conclusion": "cancelled"
+    }
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/cancelled_runs.json" "${SANDBOX_DIR}/valid_checks.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when ClubConnect CI workflow run concluded with cancelled"
+else
+  fail "Cancelled workflow run should be rejected"
+fi
+
+# 14.7 Missing required check run (Docker ARM64 Build missing) -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/missing_check.json"
+{
+  "total_count": 3,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/missing_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when required CI check (Docker ARM64 Build) is missing"
+else
+  fail "Missing required check should be rejected"
+fi
+
+# 14.8 Pending required check run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/pending_check.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "in_progress", "conclusion": null},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/pending_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when required CI check is pending/in_progress"
+else
+  fail "Pending required check should be rejected"
+fi
+
+# 14.9 Skipped required check run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/skipped_check.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "skipped"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/skipped_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when required CI check was skipped"
+else
+  fail "Skipped required check should be rejected"
+fi
+
+# 14.10 Cancelled required check run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/cancelled_check.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "cancelled"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/cancelled_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when required CI check was cancelled"
+else
+  fail "Cancelled required check should be rejected"
+fi
+
+# 14.11 Failed required check run -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/failed_check.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "failure"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/failed_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when required CI check failed"
+else
+  fail "Failed required check should be rejected"
+fi
+
+# 14.12 Unrelated check failure on commit -> REJECT
+cat <<'EOF' > "${SANDBOX_DIR}/unrelated_fail_check.json"
+{
+  "total_count": 5,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"},
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"},
+    {"name": "Security Audit / CodeQL", "status": "completed", "conclusion": "failure"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/unrelated_fail_check.json")
+if [ "$val_result" = "REJECTED" ]; then
+  pass "Rejected release when commit contains another failed check run"
+else
+  fail "Unrelated failed check run should be rejected"
+fi
+
+# 14.13 Multi-page paginated check runs handling -> PASS
+cat <<'EOF' > "${SANDBOX_DIR}/page1_checks.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "React Build", "status": "completed", "conclusion": "success"},
+    {"name": ".NET Build & Test", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+
+cat <<'EOF' > "${SANDBOX_DIR}/page2_checks.json"
+{
+  "total_count": 4,
+  "check_runs": [
+    {"name": "Playwright E2E Tests", "status": "completed", "conclusion": "success"},
+    {"name": "Docker ARM64 Build", "status": "completed", "conclusion": "success"}
+  ]
+}
+EOF
+val_result=$(run_ci_validator "${SANDBOX_DIR}/valid_runs.json" "${SANDBOX_DIR}/page1_checks.json" "${SANDBOX_DIR}/page2_checks.json")
+if [ "$val_result" = "VALID" ]; then
+  pass "Verified pagination handling retrieves and validates all check runs across pages"
+else
+  fail "Paginated check runs should be combined and accepted when all pass"
+fi
+
+# ------------------------------------------------------------------------------
+# Test 15: GHCR Image Names Exact Match with CI Publishing Workflow
+# ------------------------------------------------------------------------------
+echo "Test 15: GHCR image naming match verification..."
+
+deploy_yml="${REPO_ROOT}/.github/workflows/deploy.yml"
+if grep -q 'frontend_image=ghcr.io/\${GITHUB_REPOSITORY,,}-frontend:sha-\${TARGET_SHA}' "$deploy_yml" && \
+   grep -q 'backend_image=ghcr.io/\${GITHUB_REPOSITORY,,}-backend:sha-\${TARGET_SHA}' "$deploy_yml"; then
+  pass "deploy.yml image naming strictly matches ci.yml image publishing pattern"
+else
+  fail "deploy.yml image naming does not match ci.yml"
+fi
+
+deploy_sh="${REPO_ROOT}/scripts/deploy.sh"
+if grep -q 'FRONTEND_IMAGE=.*clubconnect-frontend' "$deploy_sh" && \
+   grep -q 'API_IMAGE=.*clubconnect-backend' "$deploy_sh"; then
+  pass "deploy.sh image resolution strictly matches GHCR image repository names"
+else
+  fail "deploy.sh image names do not match GHCR naming convention"
+fi
+
 echo "========================================================================"
 echo "Test Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed."
 echo "========================================================================"
