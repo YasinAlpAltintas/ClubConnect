@@ -69,4 +69,5 @@ volumes:
 
 networks:
   staging-internal:
-    name: clubconnect-staging-network
+    external: true
+    name: clubconnect-staging_internal
