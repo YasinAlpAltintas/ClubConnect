@@ -408,6 +408,11 @@ jobs:
           fi
           echo "Production manual confirmation input validated."
 
+      - name: Checkout deployment repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Retrieve & Verify Staging Evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -419,20 +424,27 @@ jobs:
           mkdir -p staging_evidence_download
           artifact_found=false
 
-          # Download evidence artifact from staging run
-          if gh run download --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
-            artifact_found=true
-          else
-            echo "Searching recent workflow runs for staging evidence artifact..."
-            runs=$(gh run list --workflow deploy.yml --status success --json databaseId -q '.[].databaseId' --limit 20 || true)
-            for run_id in $runs; do
-              if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
-                artifact_found=true
-                echo "Found staging evidence in workflow run $run_id"
-                break
-              fi
-            done
-          fi
+          # Locate staging evidence from a successful run of this workflow.
+          # Always specify the repository; do not rely on runner working directory.
+          echo "Searching successful deployment runs for staging evidence..."
+          runs=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy.yml \
+            --status success \
+            --json databaseId \
+            --jq '.[].databaseId' \
+            --limit 100)
+
+          for run_id in $runs; do
+            if gh run download "$run_id" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "staging-evidence-${COMMIT_SHA}" \
+              --dir staging_evidence_download 2>/dev/null; then
+              artifact_found=true
+              echo "Found staging evidence in workflow run $run_id"
+              break
+            fi
+          done
 
           if [ "$artifact_found" != "true" ] || [ ! -f staging_evidence_download/staging_evidence.json ]; then
             echo "::error::No verified staging deployment evidence found for commit $COMMIT_SHA." >&2
