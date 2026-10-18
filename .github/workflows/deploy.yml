@@ -272,10 +272,10 @@ jobs:
           fi
           echo "All required staging secrets verified present."
 
-      - name: Checkout target commit
+      - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.commit_sha }}
+          ref: main
 
       - name: Configure SSH credentials
         env:
@@ -467,10 +467,10 @@ jobs:
           echo "STAGING_FRONTEND_DIGEST=${stg_frontend_digest}" >> "$GITHUB_ENV"
           echo "STAGING_BACKEND_DIGEST=${stg_backend_digest}" >> "$GITHUB_ENV"
 
-      - name: Checkout target commit
+      - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.validate.outputs.commit_sha }}
+          ref: main
 
       - name: Configure SSH credentials
         env:
