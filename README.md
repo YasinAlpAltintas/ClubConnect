@@ -76,3 +76,17 @@ In multi-instance and production environments, migrations must **never** be exec
 2. **Backward Compatibility:** All migrations follow the expand/contract pattern so running instances remain operational during rolling deployments.
 3. **Application Container Rollout:** After the migration job completes successfully, deploy the updated application containers.
 
+---
+
+## Automated Deployment & CI/CD
+
+ClubConnect uses automated CI/CD deployment pipelines managed with GitHub Actions and Docker Compose.
+
+- **Deployment Manual & Runbooks:** See [devops/DEPLOYMENT.md](devops/DEPLOYMENT.md) for full details on:
+  - Staging (`CC-NPR`) and Production server setup
+  - GitHub Actions manual deployment trigger (`workflow_dispatch`)
+  - Automated database backup and retention policy
+  - Health checks and smoke tests
+  - Fast rollback procedures
+
+

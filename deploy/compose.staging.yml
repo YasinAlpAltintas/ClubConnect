@@ -1,0 +1,72 @@
+# ==============================================================================
+# ClubConnect - Docker Compose Staging Environment (CC-NPR)
+# ==============================================================================
+name: clubconnect-staging
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: clubconnect-staging-postgres
+    restart: unless-stopped
+    env_file:
+      - ${CONFIG_FILE}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clubconnect_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-clubconnect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clubconnect} -d ${POSTGRES_DB:-clubconnect_staging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - staging-internal
+
+  api:
+    image: ${API_IMAGE}
+    container_name: clubconnect-staging-api
+    restart: unless-stopped
+    env_file:
+      - ${CONFIG_FILE}
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Staging
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-clubconnect_staging};Username=${POSTGRES_USER:-clubconnect};Password=${POSTGRES_PASSWORD}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    networks:
+      - staging-internal
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: clubconnect-staging-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - staging-internal
+
+volumes:
+  postgres_data:
+    name: clubconnect-staging_postgres_data
+
+networks:
+  staging-internal:
+    name: clubconnect-staging-network

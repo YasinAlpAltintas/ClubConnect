@@ -1,0 +1,479 @@
+name: ClubConnect Deploy
+
+# ==============================================================================
+# Security & Operational Architecture
+# ==============================================================================
+# 1. Manual Staging Deployment: Triggered via workflow_dispatch.
+# 2. Production Promotion Gate:
+#    - Requires prior successful deployment & smoke test on staging.
+#    - Downloads verified staging evidence artifact containing exact immutable image digests.
+#    - Gated by GitHub Environment ('production') protection rules:
+#        * Required Reviewers: Senior DevOps / Tech Lead approval required.
+#        * Deployment Branches: Restricted to 'main'.
+#    - Requires explicit manual input: confirm_production == 'CONFIRM'.
+# 3. Strict Credential Isolation:
+#    - Staging uses DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+#    - Production uses PROD_DEPLOY_HOST, PROD_DEPLOY_USER, PROD_DEPLOY_SSH_KEY, PROD_DEPLOY_KNOWN_HOSTS.
+#    - Zero fallback between environments. Missing production secret fails immediately.
+# ==============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+      commit_sha:
+        description: 'Commit SHA to deploy (must be full 40-character hexadecimal SHA)'
+        required: false
+        type: string
+        default: ''
+      confirm_production:
+        description: 'Type CONFIRM to authorize production deployment (ignored for staging)'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: read
+  packages: read
+  actions: read
+
+jobs:
+  # ============================================================================
+  # 1. VALIDATE RELEASE & SECURITY GATES
+  # ============================================================================
+  validate:
+    name: Validate Release & Security Gates
+    runs-on: ubuntu-latest
+
+    outputs:
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+      image_tag: ${{ steps.validate.outputs.image_tag }}
+      frontend_image: ${{ steps.validate.outputs.frontend_image }}
+      backend_image: ${{ steps.validate.outputs.backend_image }}
+      frontend_digest: ${{ steps.validate.outputs.frontend_digest }}
+      backend_digest: ${{ steps.validate.outputs.backend_digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Commit SHA & Lineage
+        id: validate
+        env:
+          INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
+          INPUT_ENV: ${{ inputs.environment }}
+          GITHUB_SHA_DEFAULT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # 1. Resolve commit SHA
+          TARGET_SHA="${INPUT_COMMIT_SHA}"
+          if [ -z "$TARGET_SHA" ]; then
+            TARGET_SHA="${GITHUB_SHA_DEFAULT}"
+          fi
+
+          # 2. Strict 40-character hexadecimal regex check
+          if ! [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid commit SHA '${TARGET_SHA}'. Must be a 40-character lowercase hexadecimal hash." >&2
+            exit 1
+          fi
+
+          # 3. Check commit exists in repo history
+          if ! git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
+            echo "::error::Commit '${TARGET_SHA}' does not exist in repository history." >&2
+            exit 1
+          fi
+
+          # 4. Verify commit lineage (must belong to develop or main lineage)
+          IS_DEVELOP_ANCESTOR=false
+          IS_MAIN_ANCESTOR=false
+          if git merge-base --is-ancestor "$TARGET_SHA" origin/develop 2>/dev/null; then
+            IS_DEVELOP_ANCESTOR=true
+          fi
+          if git merge-base --is-ancestor "$TARGET_SHA" origin/main 2>/dev/null; then
+            IS_MAIN_ANCESTOR=true
+          fi
+
+          if [ "$INPUT_ENV" = "staging" ] && [ "$IS_DEVELOP_ANCESTOR" != "true" ] && [ "$IS_MAIN_ANCESTOR" != "true" ]; then
+            echo "::error::Commit '${TARGET_SHA}' is not in the lineage of origin/develop or origin/main. Untrusted branches cannot be deployed." >&2
+            exit 1
+          fi
+
+          if [ "$INPUT_ENV" = "production" ] && [ "$IS_MAIN_ANCESTOR" != "true" ] && [ "$IS_DEVELOP_ANCESTOR" != "true" ]; then
+            echo "::error::Production release candidate '${TARGET_SHA}' must belong to the approved release lineage." >&2
+            exit 1
+          fi
+
+          echo "commit_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${GITHUB_REPOSITORY,,}-frontend:sha-${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${GITHUB_REPOSITORY,,}-backend:sha-${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Validated commit: ${TARGET_SHA} for environment: ${INPUT_ENV}"
+
+      - name: Verify Passing CI Checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ steps.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          echo "Verifying CI check-runs for commit $COMMIT_SHA..."
+
+          checks_json=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/check-runs" || true)
+          total_count=$(jq -r '.total_count // 0' <<< "$checks_json")
+
+          if [ "$total_count" -gt 0 ]; then
+            failed_checks=$(jq -r '.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped") | .name' <<< "$checks_json")
+            if [ -n "$failed_checks" ]; then
+              echo "::error::Commit $COMMIT_SHA failed required CI checks:" >&2
+              echo "$failed_checks" >&2
+              exit 1
+            fi
+            echo "All CI check-runs concluded successfully."
+          else
+            status_json=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/status" || true)
+            status_state=$(jq -r '.state // "unknown"' <<< "$status_json")
+            if [ "$status_state" = "failure" ] || [ "$status_state" = "error" ]; then
+              echo "::error::Commit $COMMIT_SHA combined status is '$status_state'." >&2
+              exit 1
+            fi
+            echo "Combined commit status: $status_state"
+          fi
+
+      - name: Verify Container Images Exist on GHCR
+        id: inspect-images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_IMAGE: ${{ steps.validate.outputs.frontend_image }}
+          BACKEND_IMAGE: ${{ steps.validate.outputs.backend_image }}
+        run: |
+          set -euo pipefail
+
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+          echo "Inspecting frontend image: $FRONTEND_IMAGE..."
+          frontend_inspect=$(docker buildx imagetools inspect "$FRONTEND_IMAGE" 2>&1 || true)
+          if ! grep -q "Digest: sha256:" <<< "$frontend_inspect"; then
+            echo "::error::Frontend image $FRONTEND_IMAGE not found on GHCR." >&2
+            exit 1
+          fi
+          frontend_digest=$(grep -m1 "Digest: sha256:" <<< "$frontend_inspect" | awk '{print $2}')
+
+          echo "Inspecting backend image: $BACKEND_IMAGE..."
+          backend_inspect=$(docker buildx imagetools inspect "$BACKEND_IMAGE" 2>&1 || true)
+          if ! grep -q "Digest: sha256:" <<< "$backend_inspect"; then
+            echo "::error::Backend image $BACKEND_IMAGE not found on GHCR." >&2
+            exit 1
+          fi
+          backend_digest=$(grep -m1 "Digest: sha256:" <<< "$backend_inspect" | awk '{print $2}')
+
+          echo "frontend_digest=${frontend_digest}" >> "$GITHUB_OUTPUT"
+          echo "backend_digest=${backend_digest}" >> "$GITHUB_OUTPUT"
+          echo "Verified frontend digest: $frontend_digest"
+          echo "Verified backend digest: $backend_digest"
+
+  # ============================================================================
+  # 2. STAGING DEPLOYMENT (CC-NPR)
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging (CC-NPR)
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.environment == 'staging'
+    environment: staging
+
+    steps:
+      - name: Validate Staging Secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_HOST:-}" ] || [ -z "${DEPLOY_USER:-}" ] || [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+            echo "::error::Required staging secrets (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS) are missing in environment 'staging'." >&2
+            exit 1
+          fi
+          echo "All required staging secrets verified present."
+
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit_sha }}
+
+      - name: Configure SSH credentials
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Synchronize versioned release package
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Creating versioned release directory on ${DEPLOY_HOST}: /opt/clubconnect/releases/${COMMIT_SHA}..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '/opt/clubconnect/releases/${COMMIT_SHA}/scripts' '/opt/clubconnect/releases/${COMMIT_SHA}/deploy'"
+
+          echo "Uploading release scripts and Compose templates..."
+          tar -czf - scripts deploy | ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "tar -xzf - -C '/opt/clubconnect/releases/${COMMIT_SHA}/'"
+
+      - name: Execute staging deployment
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          IMAGE_TAG: ${{ needs.validate.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          echo "Executing versioned deploy.sh on ${DEPLOY_HOST}..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "COMMIT_SHA='$COMMIT_SHA' IMAGE_TAG='$IMAGE_TAG' bash -se" <<'EOF'
+          set -euo pipefail
+          chmod +x "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/"*.sh
+          "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/deploy.sh" staging "${IMAGE_TAG}"
+          EOF
+
+      - name: Retrieve staging deployment evidence
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Retrieving verified staging deployment evidence..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cat '/opt/clubconnect/releases/${COMMIT_SHA}/staging_evidence.json'" > staging_evidence.json
+
+          cat staging_evidence.json
+
+      - name: Upload staging evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-evidence-${{ needs.validate.outputs.commit_sha }}
+          path: staging_evidence.json
+          retention-days: 30
+
+  # ============================================================================
+  # 3. PRODUCTION DEPLOYMENT
+  # Protected by GitHub Environment Reviewers & Staging Evidence Verification
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: validate
+    if: inputs.environment == 'production'
+    environment: production
+
+    steps:
+      - name: Validate Production Secrets Isolation
+        env:
+          DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          # Fail immediately if any required production secret is missing
+          # NEVER fall back to staging secrets
+          if [ -z "${DEPLOY_HOST:-}" ] || [ -z "${DEPLOY_USER:-}" ] || [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+            echo "::error::Required production secrets (PROD_DEPLOY_HOST, PROD_DEPLOY_USER, PROD_DEPLOY_SSH_KEY, PROD_DEPLOY_KNOWN_HOSTS) are missing in the 'production' environment." >&2
+            echo "::error::Production deployment cannot proceed without dedicated production credentials." >&2
+            exit 1
+          fi
+          echo "Production credentials verified isolated and present."
+
+      - name: Verify Explicit Production Authorization
+        env:
+          CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM_PRODUCTION" != "CONFIRM" ]; then
+            echo "::error::Production deployment rejected. You must provide confirm_production: CONFIRM." >&2
+            exit 1
+          fi
+          echo "Production manual confirmation input validated."
+
+      - name: Retrieve & Verify Staging Evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          echo "Verifying staging deployment evidence for commit $COMMIT_SHA..."
+
+          mkdir -p staging_evidence_download
+          artifact_found=false
+
+          # Download evidence artifact from staging run
+          if gh run download --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
+            artifact_found=true
+          else
+            echo "Searching recent workflow runs for staging evidence artifact..."
+            runs=$(gh run list --workflow deploy.yml --status success --json databaseId -q '.[].databaseId' --limit 20 || true)
+            for run_id in $runs; do
+              if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
+                artifact_found=true
+                echo "Found staging evidence in workflow run $run_id"
+                break
+              fi
+            done
+          fi
+
+          if [ "$artifact_found" != "true" ] || [ ! -f staging_evidence_download/staging_evidence.json ]; then
+            echo "::error::No verified staging deployment evidence found for commit $COMMIT_SHA." >&2
+            echo "::error::Production promotion is strictly blocked until this release has been deployed and smoke-tested on staging." >&2
+            exit 1
+          fi
+
+          verified_commit=$(jq -r '.commit_sha // empty' staging_evidence_download/staging_evidence.json)
+          verified_smoke=$(jq -r '.smoke_test // empty' staging_evidence_download/staging_evidence.json)
+          stg_frontend_digest=$(jq -r '.frontend_digest // empty' staging_evidence_download/staging_evidence.json)
+          stg_backend_digest=$(jq -r '.backend_digest // empty' staging_evidence_download/staging_evidence.json)
+
+          if [ "$verified_commit" != "$COMMIT_SHA" ]; then
+            echo "::error::Staging evidence commit ($verified_commit) does not match requested commit ($COMMIT_SHA)." >&2
+            exit 1
+          fi
+
+          if [ "$verified_smoke" != "PASSED" ]; then
+            echo "::error::Staging smoke test did not pass (status: $verified_smoke)." >&2
+            exit 1
+          fi
+
+          if [ -z "$stg_frontend_digest" ] || [ -z "$stg_backend_digest" ]; then
+            echo "::error::Staging evidence does not contain verified digests." >&2
+            exit 1
+          fi
+
+          echo "Staging evidence verified:"
+          echo "  Frontend Digest: $stg_frontend_digest"
+          echo "  Backend Digest:  $stg_backend_digest"
+
+          echo "STAGING_FRONTEND_DIGEST=${stg_frontend_digest}" >> "$GITHUB_ENV"
+          echo "STAGING_BACKEND_DIGEST=${stg_backend_digest}" >> "$GITHUB_ENV"
+
+      - name: Checkout target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit_sha }}
+
+      - name: Configure SSH credentials
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Synchronize versioned release package
+        env:
+          DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Creating versioned release directory on production: /opt/clubconnect/releases/${COMMIT_SHA}..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '/opt/clubconnect/releases/${COMMIT_SHA}/scripts' '/opt/clubconnect/releases/${COMMIT_SHA}/deploy'"
+
+          echo "Uploading release scripts and Compose templates..."
+          tar -czf - scripts deploy | ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "tar -xzf - -C '/opt/clubconnect/releases/${COMMIT_SHA}/'"
+
+      - name: Execute production deployment
+        env:
+          DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          IMAGE_TAG: ${{ needs.validate.outputs.image_tag }}
+          VERIFIED_FRONTEND_DIGEST: ${{ env.STAGING_FRONTEND_DIGEST }}
+          VERIFIED_BACKEND_DIGEST: ${{ env.STAGING_BACKEND_DIGEST }}
+        run: |
+          set -euo pipefail
+
+          echo "Executing versioned deploy.sh on production with staging-verified digests..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "COMMIT_SHA='$COMMIT_SHA' IMAGE_TAG='$IMAGE_TAG' VF='$VERIFIED_FRONTEND_DIGEST' VB='$VERIFIED_BACKEND_DIGEST' bash -se" <<'EOF'
+          set -euo pipefail
+          chmod +x "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/"*.sh
+          "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/deploy.sh" production "${IMAGE_TAG}" \
+            --confirm \
+            --verified-frontend-digest="${VF}" \
+            --verified-backend-digest="${VB}"
+          EOF
