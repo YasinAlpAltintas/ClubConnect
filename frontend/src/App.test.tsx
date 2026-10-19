@@ -15,11 +15,12 @@ vi.mock('./lib/api', async (importOriginal) => {
 })
 
 import { loginMember, checkEmailExists } from './lib/api'
+import { TOKEN_STORAGE_KEY } from './lib/jwt'
 
 const mockedLogin = vi.mocked(loginMember)
 const mockedCheckEmail = vi.mocked(checkEmailExists)
 
-function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } }) {
+function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -37,6 +38,7 @@ describe('App navigation flows', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.location.hash = ''
+    window.localStorage.clear()
   })
 
   it('renders register view by default and navigates to login view', async () => {
@@ -110,11 +112,57 @@ describe('App navigation flows', () => {
     })
     expect(screen.getByText('Welcome back, visitor@example.com!')).toBeInTheDocument()
     expect(window.location.hash).toBe('#lobby')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe(validFutureToken)
 
     const logoutButtons = screen.getAllByRole('button', { name: 'Log out' })
     await user.click(logoutButtons[0])
 
     expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#login')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('restores authenticated session from localStorage on mount', () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-stored', email: 'persisted@example.com' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+
+    renderApp()
+
+    expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+    expect(screen.getByText('Welcome back, persisted@example.com!')).toBeInTheDocument()
+  })
+
+  it('purges expired token from localStorage on mount and redirects to login with session expired notice', () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const payload = btoa(JSON.stringify({ exp: 1000, sub: 'mem-stored', email: 'persisted@example.com' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+
+    renderApp()
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('purges expired token on mount even if hash is #lobby and redirects to login', () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const payload = btoa(JSON.stringify({ exp: 1000, sub: 'mem-stored', email: 'persisted@example.com' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+    window.location.hash = '#lobby'
+
+    renderApp()
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
     expect(window.location.hash).toBe('#login')
   })
 

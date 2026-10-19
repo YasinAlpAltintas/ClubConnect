@@ -119,4 +119,55 @@ test.describe('INC-8: Token Expiration and Duplicate Email Check', () => {
     await page.goto('/#login')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
   })
+
+  test('persists JWT token in localStorage on login and clears it on session expiration', async ({ page, request }) => {
+    const email = `storage-e2e-${Date.now()}@example.com`
+    const password = 'Passw0rd123!'
+
+    await request.post('/api/auth/register', { data: { email, password } })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: /Log in|Inloggen/ }).click()
+    await page.fill('#email', email)
+    await page.fill('#password', password)
+    await page.click('button[type="submit"]')
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Club Lobby/)
+
+    // Verify token is saved in localStorage
+    const storedToken = await page.evaluate(() => window.localStorage.getItem('clubconnect_token'))
+    expect(storedToken).toBeTruthy()
+    expect(storedToken?.split('.').length).toBe(3)
+
+    // Simulate expired token in localStorage
+    const secretKey = 'clubconnect_super_secret_jwt_signing_key_2026_at_least_32_bytes_long!'
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+    const expiredPayload = Buffer.from(
+      JSON.stringify({
+        sub: 'mem-e2e-exp',
+        email,
+        name: '',
+        exp: Math.floor(Date.now() / 1000) - 30,
+      }),
+    ).toString('base64url')
+    const signature = crypto.createHmac('sha256', secretKey).update(`${header}.${expiredPayload}`).digest('base64url')
+    const signedExpired = `${header}.${expiredPayload}.${signature}`
+
+    await page.evaluate((tok) => {
+      window.localStorage.setItem('clubconnect_token', tok)
+    }, signedExpired)
+
+    // Reload page
+    await page.reload()
+
+    // Confirms redirection to login with session expired alert
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
+    const alert = page.locator('[role="alert"]')
+    await expect(alert).toBeVisible()
+    await expect(alert).toContainText(/session has expired|sessie is verlopen/i)
+
+    // Confirms token was purged from localStorage
+    const clearedToken = await page.evaluate(() => window.localStorage.getItem('clubconnect_token'))
+    expect(clearedToken).toBeNull()
+  })
 })
