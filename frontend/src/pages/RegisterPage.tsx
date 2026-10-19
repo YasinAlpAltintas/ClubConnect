@@ -10,7 +10,11 @@ import { type SupportedLanguage } from '../i18n'
 
 type FieldError = 'email' | 'password' | null
 
-export default function RegisterPage() {
+export interface RegisterPageProps {
+  onNavigateToLogin?: () => void
+}
+
+export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = {}) {
   const { t, i18n } = useTranslation()
   const [serverError, setServerError] = useState<{ key: string; status?: number } | null>(null)
   const [fieldError, setFieldError] = useState<FieldError>(null)
@@ -68,6 +72,17 @@ export default function RegisterPage() {
           <p className="mt-3 text-slate-600">
             {t('success.message', { email: success.email })}
           </p>
+          {onNavigateToLogin && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={onNavigateToLogin}
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-500 cursor-pointer"
+              >
+                {t('register.loginLink')}
+              </button>
+            </div>
+          )}
           <div className="mt-8 flex justify-end">
             <button
               type="button"
@@ -179,6 +194,19 @@ export default function RegisterPage() {
               {isSubmitting ? t('register.submitting') : t('register.submit')}
             </button>
           </form>
+
+          {onNavigateToLogin && (
+            <div className="mt-6 text-center text-sm text-slate-600">
+              <span>{t('register.alreadyAccount')} </span>
+              <button
+                type="button"
+                onClick={onNavigateToLogin}
+                className="font-medium text-indigo-600 hover:text-indigo-500 underline cursor-pointer"
+              >
+                {t('register.loginLink')}
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </main>

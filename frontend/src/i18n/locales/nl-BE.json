@@ -7,6 +7,10 @@
     "language": "Taal",
     "languageToggle": "English"
   },
+  "nav": {
+    "toLogin": "Heb je al een account? Log in",
+    "toRegister": "Nog geen account? Registreer"
+  },
   "register": {
     "title": "Maak een account aan",
     "subtitle": "Word lid van ClubConnect en maak kennis met studentenclubs.",
@@ -15,6 +19,8 @@
     "password": "Wachtwoord",
     "submit": "Account aanmaken",
     "submitting": "Account wordt aangemaakt…",
+    "alreadyAccount": "Heb je al een account?",
+    "loginLink": "Inloggen",
     "errors": {
       "required": "Dit veld is verplicht.",
       "email_invalid": "Vul een geldig e-mailadres in.",
@@ -29,6 +35,34 @@
       "network": "Er ging iets mis. Probeer het nog eens.",
       "unexpected": "Onverwacht antwoord ({{status}})."
     }
+  },
+  "login": {
+    "title": "Inloggen op je account",
+    "subtitle": "Welkom terug! Vul je gegevens in om naar je lobby te gaan.",
+    "email": "E-mailadres",
+    "emailPlaceholder": "jij@voorbeeld.be",
+    "password": "Wachtwoord",
+    "submit": "Inloggen",
+    "submitting": "Bezig met inloggen…",
+    "noAccount": "Nog geen account?",
+    "registerLink": "Maak een account aan",
+    "errors": {
+      "required": "Dit veld is verplicht.",
+      "email_invalid": "Vul een geldig e-mailadres in."
+    },
+    "api": {
+      "invalid_credentials": "Ongeldig e-mailadres of wachtwoord.",
+      "invalid_input": "Vul een geldig e-mailadres en wachtwoord in.",
+      "network": "Er ging iets mis. Probeer het nog eens.",
+      "unexpected": "Onverwacht antwoord ({{status}})."
+    }
+  },
+  "lobby": {
+    "title": "Club Lobby",
+    "welcome": "Welkom terug, {{email}}!",
+    "memberId": "Lid ID",
+    "subtitle": "Je bent ingelogd op ClubConnect.",
+    "logout": "Uitloggen"
   },
   "success": {
     "title": "Account aangemaakt",

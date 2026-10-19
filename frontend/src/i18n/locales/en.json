@@ -7,6 +7,10 @@
     "language": "Language",
     "languageToggle": "Nederlands"
   },
+  "nav": {
+    "toLogin": "Already have an account? Log in",
+    "toRegister": "Don't have an account yet? Register"
+  },
   "register": {
     "title": "Create your account",
     "subtitle": "Join ClubConnect to connect with student clubs.",
@@ -15,6 +19,8 @@
     "password": "Password",
     "submit": "Create account",
     "submitting": "Creating account…",
+    "alreadyAccount": "Already have an account?",
+    "loginLink": "Log in",
     "errors": {
       "required": "This field is required.",
       "email_invalid": "Enter a valid e-mail address.",
@@ -29,6 +35,34 @@
       "network": "Something went wrong. Please try again.",
       "unexpected": "Unexpected response ({{status}})."
     }
+  },
+  "login": {
+    "title": "Log in to your account",
+    "subtitle": "Welcome back! Enter your details to access your lobby.",
+    "email": "E-mail address",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…",
+    "noAccount": "Don't have an account yet?",
+    "registerLink": "Create an account",
+    "errors": {
+      "required": "This field is required.",
+      "email_invalid": "Enter a valid e-mail address."
+    },
+    "api": {
+      "invalid_credentials": "Invalid e-mail address or password.",
+      "invalid_input": "Please provide a valid e-mail address and password.",
+      "network": "Something went wrong. Please try again.",
+      "unexpected": "Unexpected response ({{status}})."
+    }
+  },
+  "lobby": {
+    "title": "Club Lobby",
+    "welcome": "Welcome back, {{email}}!",
+    "memberId": "Member ID",
+    "subtitle": "You are logged in to ClubConnect.",
+    "logout": "Log out"
   },
   "success": {
     "title": "Account created",
