@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { test, expect } from '@playwright/test'
 
 test.describe('INC-8: Token Expiration and Duplicate Email Check', () => {
@@ -23,10 +24,10 @@ test.describe('INC-8: Token Expiration and Duplicate Email Check', () => {
     expect(nonExistentData.exists).toBe(false)
 
     // Navigate to registration page in UI
-    await page.goto('/#register')
+    await page.goto('/')
     await page.fill('#email', existingEmail)
-    // Blur email field by clicking password input
-    await page.locator('#password').focus()
+    // Blur email field
+    await page.locator('#email').blur()
 
     // Verify inline duplicate email error appears on blur
     const emailError = page.locator('#email-error')
@@ -62,23 +63,33 @@ test.describe('INC-8: Token Expiration and Duplicate Email Check', () => {
     expect(unauthRes.status()).toBe(401)
 
     // 3. Calling /api/auth/me with an expired JWT token returns 401 token_expired
-    // Craft expired token header & payload (HS256)
+    const secretKey = 'clubconnect_super_secret_jwt_signing_key_2026_at_least_32_bytes_long!'
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
     const expiredPayload = Buffer.from(
       JSON.stringify({
         sub: loginData.memberId,
         email,
+        name: '',
         exp: Math.floor(Date.now() / 1000) - 60, // expired 60 seconds ago
       }),
     ).toString('base64url')
-    const fakeExpiredToken = `${header}.${expiredPayload}.invalidsig`
+    const signature = crypto.createHmac('sha256', secretKey).update(`${header}.${expiredPayload}`).digest('base64url')
+    const signedExpiredToken = `${header}.${expiredPayload}.${signature}`
 
     const expiredRes = await request.get('/api/auth/me', {
-      headers: { Authorization: `Bearer ${fakeExpiredToken}` },
+      headers: { Authorization: `Bearer ${signedExpiredToken}` },
     })
     expect(expiredRes.status()).toBe(401)
     const expiredBody = await expiredRes.json()
     expect(expiredBody.error).toBe('token_expired')
+
+    // 4. Calling /api/auth/me with an invalid signature token returns 401 invalid_token
+    const invalidRes = await request.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${header}.${expiredPayload}.invalidsig` },
+    })
+    expect(invalidRes.status()).toBe(401)
+    const invalidBody = await invalidRes.json()
+    expect(invalidBody.error).toBe('invalid_token')
   })
 
   test('displays session expired alert and redirects to login when token is expired', async ({ page }) => {

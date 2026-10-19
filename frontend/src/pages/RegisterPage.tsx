@@ -187,6 +187,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                   {onNavigateToLogin && (
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={onNavigateToLogin}
                       className="ml-2 font-medium text-indigo-600 hover:text-indigo-500 underline cursor-pointer"
                     >

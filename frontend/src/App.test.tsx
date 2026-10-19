@@ -10,12 +10,14 @@ vi.mock('./lib/api', async (importOriginal) => {
     ...actual,
     loginMember: vi.fn(),
     registerMember: vi.fn(),
+    checkEmailExists: vi.fn(),
   }
 })
 
-import { loginMember } from './lib/api'
+import { loginMember, checkEmailExists } from './lib/api'
 
 const mockedLogin = vi.mocked(loginMember)
+const mockedCheckEmail = vi.mocked(checkEmailExists)
 
 function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } }) {
   const queryClient = new QueryClient({
@@ -45,6 +47,26 @@ describe('App navigation flows', () => {
 
     const loginButton = screen.getByRole('button', { name: 'Log in' })
     await user.click(loginButton)
+
+    expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#login')
+  })
+
+  it('navigates to login view when clicking inline Log in link on duplicate email', async () => {
+    const user = userEvent.setup()
+    mockedCheckEmail.mockResolvedValue(true)
+    renderApp()
+
+    const emailInput = screen.getByLabelText('E-mail address')
+    await user.type(emailInput, 'existing@example.com')
+    await user.tab()
+
+    expect(await screen.findByText('An account with this e-mail already exists.')).toBeInTheDocument()
+
+    const loginButtons = screen.getAllByRole('button', { name: 'Log in' })
+    expect(loginButtons.length).toBe(2)
+    // Click the inline login button (the first one, inside email error)
+    await user.click(loginButtons[0])
 
     expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
     expect(window.location.hash).toBe('#login')
