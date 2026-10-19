@@ -20,6 +20,7 @@ const mockedLogin = vi.mocked(loginMember)
 function renderLoginPage(props: {
   onLoginSuccess?: (member: { memberId: string; email: string; displayName?: string | null }) => void
   onNavigateToRegister?: () => void
+  sessionExpired?: boolean
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -36,6 +37,7 @@ function renderLoginPage(props: {
         <LoginPage
           onLoginSuccess={onLoginSuccess}
           onNavigateToRegister={onNavigateToRegister}
+          sessionExpired={props.sessionExpired}
         />
       </QueryClientProvider>,
     ),
@@ -101,6 +103,7 @@ describe('LoginPage', () => {
       memberId: 'm-123',
       email: 'visitor@example.com',
       displayName: null,
+      token: 'mock.valid.token',
     })
 
     renderLoginPage({ onLoginSuccess })
@@ -118,6 +121,7 @@ describe('LoginPage', () => {
         memberId: 'm-123',
         email: 'visitor@example.com',
         displayName: null,
+        token: 'mock.valid.token',
       })
     })
   })
@@ -204,4 +208,12 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('heading', { name: 'Inloggen op je account' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Inloggen' })).toBeInTheDocument()
   })
+
+  it('displays session expired alert banner when sessionExpired is true', async () => {
+    renderLoginPage({ sessionExpired: true })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Your session has expired. Please log in again.')
+  })
 })
+

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -10,14 +10,16 @@ vi.mock('./lib/api', async (importOriginal) => {
     ...actual,
     loginMember: vi.fn(),
     registerMember: vi.fn(),
+    checkEmailExists: vi.fn(),
   }
 })
 
-import { loginMember } from './lib/api'
+import { loginMember, checkEmailExists } from './lib/api'
 
 const mockedLogin = vi.mocked(loginMember)
+const mockedCheckEmail = vi.mocked(checkEmailExists)
 
-function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string } }) {
+function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -50,6 +52,26 @@ describe('App navigation flows', () => {
     expect(window.location.hash).toBe('#login')
   })
 
+  it('navigates to login view when clicking inline Log in link on duplicate email', async () => {
+    const user = userEvent.setup()
+    mockedCheckEmail.mockResolvedValue(true)
+    renderApp()
+
+    const emailInput = screen.getByLabelText('E-mail address')
+    await user.type(emailInput, 'existing@example.com')
+    await user.tab()
+
+    expect(await screen.findByText('An account with this e-mail already exists.')).toBeInTheDocument()
+
+    const loginButtons = screen.getAllByRole('button', { name: 'Log in' })
+    expect(loginButtons.length).toBe(2)
+    // Click the inline login button (the first one, inside email error)
+    await user.click(loginButtons[0])
+
+    expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#login')
+  })
+
   it('navigates from login view back to register view', async () => {
     const user = userEvent.setup()
     renderApp({ initialView: 'login' })
@@ -65,10 +87,16 @@ describe('App navigation flows', () => {
 
   it('navigates to lobby on successful login and back to login on logout', async () => {
     const user = userEvent.setup()
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-999', email: 'visitor@example.com' })).replace(/=/g, '')
+    const validFutureToken = `${header}.${payload}.sig`
+
     mockedLogin.mockResolvedValueOnce({
       memberId: 'mem-999',
       email: 'visitor@example.com',
       displayName: null,
+      token: validFutureToken,
     })
 
     renderApp({ initialView: 'login' })
@@ -108,4 +136,61 @@ describe('App navigation flows', () => {
 
     expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
   })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('automatically redirects to login with session expired notice when JWT token expires', () => {
+    vi.useFakeTimers()
+    const now = 1000000000 * 1000
+    vi.setSystemTime(new Date(now))
+
+    // Token expires in 10 seconds
+    const exp = 1000000000 + 10
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-1' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    renderApp({
+      initialView: 'lobby',
+      initialMember: {
+        memberId: 'mem-1',
+        email: 'user@example.com',
+        token,
+      },
+    })
+
+    expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+
+    // Advance timers past expiration
+    act(() => {
+      vi.advanceTimersByTime(11000)
+    })
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
+  })
+
+  it('redirects to login immediately if token is already expired on mount', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    // Expired in 2000
+    const payload = btoa(JSON.stringify({ exp: 1000, sub: 'mem-1' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    renderApp({
+      initialView: 'lobby',
+      initialMember: {
+        memberId: 'mem-1',
+        email: 'user@example.com',
+        token,
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
+  })
 })
+

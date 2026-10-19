@@ -1,6 +1,10 @@
+using ClubConnect.Application.Abstractions;
 using ClubConnect.Application.Members;
+using ClubConnect.Domain.Abstractions;
+using ClubConnect.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace ClubConnect.Api.Controllers;
 
@@ -11,8 +15,13 @@ namespace ClubConnect.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(
     RegisterMemberUseCase registerMemberUseCase,
-    LoginMemberUseCase loginMemberUseCase) : ControllerBase
+    LoginMemberUseCase loginMemberUseCase,
+    IJwtTokenService? jwtTokenService = null,
+    IMemberRepository? memberRepository = null) : ControllerBase
 {
+    private readonly IJwtTokenService _jwtTokenService =
+        jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
+
     /// <summary>Request body for <c>POST /api/auth/register</c>.</summary>
     public sealed record RegisterRequest(
         [property: System.Text.Json.Serialization.JsonPropertyName("email")] string? Email,
@@ -29,11 +38,17 @@ public class AuthController(
         [property: System.Text.Json.Serialization.JsonPropertyName("email")] string? Email,
         [property: System.Text.Json.Serialization.JsonPropertyName("password")] string? Password);
 
-    /// <summary>Success payload for <c>POST /api/auth/login</c>.</summary>
+    /// <summary>Success payload for <c>POST /api/auth/login</c> and <c>GET /api/auth/me</c>.</summary>
     public sealed record LoginResponse(
         Guid MemberId,
         string Email,
-        string DisplayName);
+        string DisplayName,
+        string Token);
+
+    /// <summary>Response payload for <c>GET /api/auth/check-email</c>.</summary>
+    public sealed record CheckEmailResponse(
+        string Email,
+        bool Exists);
 
     /// <summary>
     /// Authenticates a club member.
@@ -53,12 +68,80 @@ public class AuthController(
 
         var outcome = await loginMemberUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
 
+        if (outcome.Status == LoginStatus.Success)
+        {
+            var member = new Member
+            {
+                Id = outcome.MemberId!.Value,
+                Email = outcome.Email!,
+                DisplayName = outcome.DisplayName ?? string.Empty,
+                PasswordHash = string.Empty,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            };
+            var token = _jwtTokenService.GenerateToken(member);
+            return Ok(new LoginResponse(outcome.MemberId!.Value, outcome.Email!, outcome.DisplayName ?? string.Empty, token));
+        }
+
         return outcome.Status switch
         {
-            LoginStatus.Success => Ok(new LoginResponse(outcome.MemberId!.Value, outcome.Email!, outcome.DisplayName ?? string.Empty)),
             LoginStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
             _ => Unauthorized(new { error = "invalid_credentials", detail = outcome.Violation ?? "Invalid email or password." })
         };
+    }
+
+    /// <summary>
+    /// Retrieves the profile of the authenticated member using the Bearer token.
+    /// 200 → authenticated · 401 → token missing, invalid, or expired.
+    /// </summary>
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult GetProfile()
+    {
+        var authHeader = Request.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var result = _jwtTokenService.ValidateToken(token);
+
+        return result.Status switch
+        {
+            JwtValidationStatus.Valid => Ok(new LoginResponse(result.MemberId!.Value, result.Email!, result.DisplayName ?? string.Empty, token)),
+            JwtValidationStatus.Expired => Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." }),
+            _ => Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." })
+        };
+    }
+
+    /// <summary>
+    /// Checks whether an email address already has an existing account.
+    /// 200 → checked · 400 → invalid email format.
+    /// </summary>
+    [HttpGet("check-email")]
+    [ProducesResponseType(typeof(CheckEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CheckEmail([FromQuery] string? email, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return BadRequest(new { error = "invalid_input", detail = "Email is required." });
+        }
+
+        var canonical = MemberEmail.Canonicalize(email);
+        if (canonical is null)
+        {
+            return BadRequest(new { error = "invalid_input", detail = "Invalid email format." });
+        }
+
+        if (memberRepository is null)
+        {
+            return Ok(new CheckEmailResponse(canonical, false));
+        }
+
+        var existing = await memberRepository.FindByEmailAsync(canonical, cancellationToken).ConfigureAwait(false);
+        return Ok(new CheckEmailResponse(canonical, existing is not null));
     }
 
     /// <summary>

@@ -46,6 +46,7 @@
     "submitting": "Bezig met inloggen…",
     "noAccount": "Nog geen account?",
     "registerLink": "Maak een account aan",
+    "sessionExpired": "Je sessie is verlopen. Log opnieuw in.",
     "errors": {
       "required": "Dit veld is verplicht.",
       "email_invalid": "Vul een geldig e-mailadres in."

@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { registerSchema, type RegisterInput } from '../schemas/register'
-import { registerMember, type RegisterSuccessResponse } from '../lib/api'
+import { registerMember, checkEmailExists, type RegisterSuccessResponse } from '../lib/api'
 import { apiErrorToKey } from '../lib/mapApiError'
 import { type SupportedLanguage } from '../i18n'
 
@@ -18,11 +18,13 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
   const { t, i18n } = useTranslation()
   const [serverError, setServerError] = useState<{ key: string; status?: number } | null>(null)
   const [fieldError, setFieldError] = useState<FieldError>(null)
+  const [emailConflict, setEmailConflict] = useState(false)
   const [success, setSuccess] = useState<RegisterSuccessResponse | null>(null)
 
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -40,9 +42,24 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
     void i18n.changeLanguage(next)
   }
 
+  async function handleEmailBlur() {
+    const emailVal = getValues('email')
+    if (emailVal && registerSchema.shape.email.safeParse(emailVal).success) {
+      const exists = await checkEmailExists(emailVal)
+      if (exists) {
+        setEmailConflict(true)
+        setFieldError('email')
+      } else if (emailConflict) {
+        setEmailConflict(false)
+        if (fieldError === 'email') setFieldError(null)
+      }
+    }
+  }
+
   function onSubmit(data: RegisterInput) {
     setServerError(null)
     setFieldError(null)
+    setEmailConflict(false)
     mutation.mutate(data, {
       onSuccess: (result) => {
         setSuccess(result)
@@ -50,7 +67,10 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
       onError: (error) => {
         const resolved = apiErrorToKey(error)
         setServerError(resolved)
-        if (resolved.key === 'invalid_email') {
+        if (resolved.key === 'conflict') {
+          setEmailConflict(true)
+          setFieldError('email')
+        } else if (resolved.key === 'invalid_email') {
           setFieldError('email')
         } else if (resolved.key === 'invalid_password') {
           setFieldError('password')
@@ -142,22 +162,46 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                 id="email"
                 autoComplete="email"
                 placeholder={t('register.emailPlaceholder')}
-                aria-invalid={Boolean(errors.email || fieldError === 'email')}
-                aria-describedby={errors.email ? 'email-error' : undefined}
+                aria-invalid={Boolean(errors.email || fieldError === 'email' || emailConflict)}
+                aria-describedby={errors.email || emailConflict ? 'email-error' : undefined}
                 className={`mt-1 block w-full rounded-lg border px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 ${
-                  errors.email || fieldError === 'email'
+                  errors.email || fieldError === 'email' || emailConflict
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500/40'
                     : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/40'
                 }`}
-                {...register('email')}
+                {...register('email', {
+                  onBlur: () => {
+                    void handleEmailBlur()
+                  },
+                  onChange: () => {
+                    if (emailConflict) {
+                      setEmailConflict(false)
+                      if (fieldError === 'email') setFieldError(null)
+                    }
+                  },
+                })}
               />
-              {errors.email && (
+              {emailConflict ? (
+                <div id="email-error" className="mt-1 flex items-center justify-between text-sm text-red-600">
+                  <span>{t('register.api.conflict')}</span>
+                  {onNavigateToLogin && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={onNavigateToLogin}
+                      className="ml-2 font-medium text-indigo-600 hover:text-indigo-500 underline cursor-pointer"
+                    >
+                      {t('register.loginLink')}
+                    </button>
+                  )}
+                </div>
+              ) : errors.email ? (
                 <p id="email-error" className="mt-1 text-sm text-red-600">
                   {t(`register.errors.${errors.email.message ?? 'required'}`, {
                     min: 8,
                   })}
                 </p>
-              )}
+              ) : null}
             </div>
 
             <div>

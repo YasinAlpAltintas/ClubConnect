@@ -6,6 +6,8 @@ import {
   classifyLoginError,
   loginMember,
   LoginApiException,
+  checkEmailExists,
+  getAuthProfile,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -187,10 +189,10 @@ describe('classifyLoginError', () => {
 })
 
 describe('loginMember', () => {
-  it('returns member details on 200', async () => {
+  it('returns member details and token on 200', async () => {
     const fetchFn = (async () =>
       jsonResponse(
-        { memberId: 'member-123', email: 'user@example.com', displayName: 'User' },
+        { memberId: 'member-123', email: 'user@example.com', displayName: 'User', token: 'jwt-token-123' },
         200,
       )) as typeof fetch
 
@@ -203,6 +205,7 @@ describe('loginMember', () => {
       memberId: 'member-123',
       email: 'user@example.com',
       displayName: 'User',
+      token: 'jwt-token-123',
     })
   })
 
@@ -310,4 +313,66 @@ describe('loginApiErrorToKey', () => {
     expect(loginApiErrorToKey(new Error('other'))).toEqual({ key: 'network' })
   })
 })
+
+describe('checkEmailExists', () => {
+  it('returns true when API returns exists: true', async () => {
+    const fetchFn = (async () => jsonResponse({ exists: true })) as typeof fetch
+    const exists = await checkEmailExists('existing@example.com', fetchFn)
+    expect(exists).toBe(true)
+  })
+
+  it('returns false when API returns exists: false', async () => {
+    const fetchFn = (async () => jsonResponse({ exists: false })) as typeof fetch
+    const exists = await checkEmailExists('new@example.com', fetchFn)
+    expect(exists).toBe(false)
+  })
+
+  it('returns false when fetch fails', async () => {
+    const fetchFn = (async () => {
+      throw new Error('Network error')
+    }) as typeof fetch
+    const exists = await checkEmailExists('new@example.com', fetchFn)
+    expect(exists).toBe(false)
+  })
+
+  it('returns false on non-200 response', async () => {
+    const fetchFn = (async () => jsonResponse({}, 400)) as typeof fetch
+    const exists = await checkEmailExists('bad', fetchFn)
+    expect(exists).toBe(false)
+  })
+})
+
+describe('getAuthProfile', () => {
+  it('returns profile when response is 200', async () => {
+    const fetchFn = (async () =>
+      jsonResponse(
+        { memberId: 'm-1', email: 'ada@example.com', displayName: 'Ada' },
+        200,
+      )) as typeof fetch
+
+    const profile = await getAuthProfile('my-token', fetchFn)
+    expect(profile).toEqual({
+      memberId: 'm-1',
+      email: 'ada@example.com',
+      displayName: 'Ada',
+      token: 'my-token',
+    })
+  })
+
+  it('throws LoginApiException on 401', async () => {
+    const fetchFn = (async () =>
+      jsonResponse({ error: 'token_expired' }, 401)) as typeof fetch
+
+    await expect(getAuthProfile('expired-token', fetchFn)).rejects.toThrow(LoginApiException)
+  })
+
+  it('throws LoginApiException on network failure', async () => {
+    const fetchFn = (async () => {
+      throw new TypeError('Failed to fetch')
+    }) as typeof fetch
+
+    await expect(getAuthProfile('token', fetchFn)).rejects.toThrow(LoginApiException)
+  })
+})
+
 

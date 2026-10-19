@@ -11,14 +11,17 @@ import { type SupportedLanguage } from '../i18n'
 export interface LoginPageProps {
   onLoginSuccess: (member: LoginSuccessResponse) => void
   onNavigateToRegister: () => void
+  sessionExpired?: boolean
 }
 
 export default function LoginPage({
   onLoginSuccess,
   onNavigateToRegister,
+  sessionExpired = false,
 }: LoginPageProps) {
   const { t, i18n } = useTranslation()
   const [serverError, setServerError] = useState<ResolvedLoginApiError | null>(null)
+  const [expiredNoticeVisible, setExpiredNoticeVisible] = useState(sessionExpired)
 
   const {
     register,
@@ -42,6 +45,7 @@ export default function LoginPage({
 
   function onSubmit(data: LoginInput) {
     setServerError(null)
+    setExpiredNoticeVisible(false)
     mutation.mutate(data, {
       onSuccess: (result) => {
         onLoginSuccess(result)
@@ -78,6 +82,15 @@ export default function LoginPage({
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-8 space-y-5">
+            {expiredNoticeVisible && (
+              <div
+                role="alert"
+                className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800"
+              >
+                {t('login.sessionExpired')}
+              </div>
+            )}
+
             {serverError && (
               <div
                 role="alert"

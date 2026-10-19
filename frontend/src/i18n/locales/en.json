@@ -46,6 +46,7 @@
     "submitting": "Logging in…",
     "noAccount": "Don't have an account yet?",
     "registerLink": "Create an account",
+    "sessionExpired": "Your session has expired. Please log in again.",
     "errors": {
       "required": "This field is required.",
       "email_invalid": "Enter a valid e-mail address."
