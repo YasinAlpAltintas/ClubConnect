@@ -9,6 +9,7 @@ import {
   checkEmailExists,
   getAuthProfile,
   logoutMember,
+  getMemberClubs,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -400,6 +401,48 @@ describe('logoutMember', () => {
     }) as typeof fetch
 
     await expect(logoutMember('my-token', fetchFn)).resolves.toBeUndefined()
+  })
+})
+
+describe('getMemberClubs', () => {
+  it('calls GET /api/auth/me/clubs with authorization header and returns clubs list', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+
+    const dummyClubs = [
+      { id: 'club-1', name: 'Computer Science Club', description: 'Tech enthusiasts', role: 'Member' }
+    ]
+
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      capturedUrl = String(url)
+      capturedInit = init
+      return jsonResponse(dummyClubs, 200)
+    }) as typeof fetch
+
+    const result = await getMemberClubs('my-token', fetchFn)
+
+    expect(capturedUrl).toBe('/api/auth/me/clubs')
+    expect(capturedInit?.method).toBe('GET')
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBe('Bearer my-token')
+    expect(result).toEqual(dummyClubs)
+  })
+
+  it('calls GET /api/auth/me/clubs without authorization header when token is not provided', async () => {
+    let capturedInit: RequestInit | undefined
+
+    const fetchFn = (async (_url: string | URL | Request, init?: RequestInit) => {
+      capturedInit = init
+      return jsonResponse([], 200)
+    }) as typeof fetch
+
+    const result = await getMemberClubs(undefined, fetchFn)
+    expect(result).toEqual([])
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBeUndefined()
+  })
+
+  it('throws error when server responds with non-ok status', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'unauthorized' }, 401)) as typeof fetch
+    await expect(getMemberClubs('bad-token', fetchFn)).rejects.toThrow('Failed to fetch member clubs (401)')
   })
 })
 
