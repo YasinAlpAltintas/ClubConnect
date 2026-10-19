@@ -11,15 +11,17 @@ vi.mock('./lib/api', async (importOriginal) => {
     loginMember: vi.fn(),
     registerMember: vi.fn(),
     checkEmailExists: vi.fn(),
+    logoutMember: vi.fn(),
   }
 })
 
-import { loginMember, checkEmailExists } from './lib/api'
+import { loginMember, checkEmailExists, logoutMember } from './lib/api'
 
 const mockedLogin = vi.mocked(loginMember)
 const mockedCheckEmail = vi.mocked(checkEmailExists)
+const mockedLogout = vi.mocked(logoutMember)
 
-function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } }) {
+function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -115,7 +117,41 @@ describe('App navigation flows', () => {
     await user.click(logoutButtons[0])
 
     expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(mockedLogout).toHaveBeenCalledWith(validFutureToken)
     expect(window.location.hash).toBe('#login')
+  })
+
+  it('safely logs out when clicking card body logout button', async () => {
+    const user = userEvent.setup()
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-999', email: 'visitor@example.com' })).replace(/=/g, '')
+    const validFutureToken = `${header}.${payload}.sig`
+
+    renderApp({
+      initialView: 'lobby',
+      initialMember: {
+        memberId: 'mem-999',
+        email: 'visitor@example.com',
+        token: validFutureToken,
+      },
+    })
+
+    expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+
+    const logoutButtons = screen.getAllByRole('button', { name: 'Log out' })
+    expect(logoutButtons.length).toBe(2)
+    // Click the card body logout button (second button)
+    await user.click(logoutButtons[1])
+
+    expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(mockedLogout).toHaveBeenCalledWith(validFutureToken)
+    expect(window.location.hash).toBe('#login')
+  })
+
+  it('redirects unauthenticated visitor to login when initialView is lobby without member', () => {
+    renderApp({ initialView: 'lobby', initialMember: null })
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
   })
 
   it('responds to window hashchange events', async () => {

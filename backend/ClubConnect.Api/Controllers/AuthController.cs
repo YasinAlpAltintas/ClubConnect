@@ -116,6 +116,17 @@ public class AuthController(
     }
 
     /// <summary>
+    /// Closes the authenticated session.
+    /// 200 → session closed.
+    /// </summary>
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult Logout()
+    {
+        return Ok(new { message = "Logged out successfully." });
+    }
+
+    /// <summary>
     /// Checks whether an email address already has an existing account.
     /// 200 → checked · 400 → invalid email format.
     /// </summary>

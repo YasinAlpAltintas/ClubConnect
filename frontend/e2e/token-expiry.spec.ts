@@ -119,4 +119,32 @@ test.describe('INC-8: Token Expiration and Duplicate Email Check', () => {
     await page.goto('/#login')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
   })
+
+  test('safely logs out via Logout button and redirects to login, preventing unauthenticated lobby access', async ({ page, request }) => {
+    const email = `inc8-logout-${Date.now()}@example.com`
+    const password = 'Passw0rd123!'
+
+    // Register account
+    await request.post('/api/auth/register', { data: { email, password } })
+
+    await page.goto('/')
+    // Navigate to login
+    await page.getByRole('button', { name: /Log in|Inloggen/ }).click()
+    await page.fill('#email', email)
+    await page.fill('#password', password)
+    await page.click('button[type="submit"]')
+
+    // Confirm Lobby is reached
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Club Lobby/)
+
+    // Click Logout button
+    await page.getByRole('button', { name: /Log out|Uitloggen/ }).first().click()
+
+    // Confirms safe redirection to Login screen
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
+
+    // Direct navigation to /#lobby without session stays protected on login
+    await page.goto('/#lobby')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
+  })
 })

@@ -8,6 +8,7 @@ import {
   LoginApiException,
   checkEmailExists,
   getAuthProfile,
+  logoutMember,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -372,6 +373,33 @@ describe('getAuthProfile', () => {
     }) as typeof fetch
 
     await expect(getAuthProfile('token', fetchFn)).rejects.toThrow(LoginApiException)
+  })
+})
+
+describe('logoutMember', () => {
+  it('calls POST /api/auth/logout with authorization header when token is provided', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      capturedUrl = String(url)
+      capturedInit = init
+      return jsonResponse({ message: 'Logged out' }, 200)
+    }) as typeof fetch
+
+    await logoutMember('my-token', fetchFn)
+
+    expect(capturedUrl).toBe('/api/auth/logout')
+    expect(capturedInit?.method).toBe('POST')
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBe('Bearer my-token')
+  })
+
+  it('gracefully handles network error on logout', async () => {
+    const fetchFn = (async () => {
+      throw new TypeError('Failed to fetch')
+    }) as typeof fetch
+
+    await expect(logoutMember('my-token', fetchFn)).resolves.toBeUndefined()
   })
 })
 

@@ -3,6 +3,7 @@ import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import LobbyPage, { type AuthenticatedMember } from './pages/LobbyPage'
 import { getTokenRemainingTimeMs } from './lib/jwt'
+import { logoutMember } from './lib/api'
 
 export type AppView = 'register' | 'login' | 'lobby'
 
@@ -34,6 +35,8 @@ export default function App({
         setView('login')
       } else if (hash === '#register') {
         setView('register')
+      } else if (hash === '#lobby') {
+        setView('lobby')
       }
     }
 
@@ -67,11 +70,31 @@ export default function App({
     return () => clearTimeout(timer)
   }, [member, view])
 
-  if (view === 'lobby' && member) {
+  if (view === 'lobby') {
+    if (!member) {
+      return (
+        <LoginPage
+          sessionExpired={sessionExpired}
+          onLoginSuccess={(authMember) => {
+            setSessionExpired(false)
+            setMember(authMember)
+            navigateTo('lobby')
+          }}
+          onNavigateToRegister={() => {
+            setSessionExpired(false)
+            navigateTo('register')
+          }}
+        />
+      )
+    }
+
     return (
       <LobbyPage
         member={member}
         onLogout={() => {
+          if (member?.token) {
+            void logoutMember(member.token)
+          }
           setMember(null)
           setSessionExpired(false)
           navigateTo('login')
