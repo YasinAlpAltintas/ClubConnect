@@ -10,6 +10,7 @@ import {
   parseJwt,
   isTokenExpired,
 } from './lib/jwt'
+import { logoutMember } from './lib/api'
 
 export type AppView = 'register' | 'login' | 'lobby'
 
@@ -159,6 +160,9 @@ export default function App({
         <LobbyPage
           member={member}
           onLogout={() => {
+            if (member?.token) {
+              void logoutMember(member.token)
+            }
             removeStoredToken()
             setMember(null)
             setSessionExpired(false)

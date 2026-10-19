@@ -303,5 +303,15 @@ public class AuthControllerTests
         var response = Assert.IsType<AuthController.CheckEmailResponse>(okResult.Value);
         Assert.False(response.Exists);
     }
+
+    [Fact]
+    public void Logout_Returns200Ok()
+    {
+        var controller = CreateController();
+        var result = controller.Logout();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(200, okResult.StatusCode);
+    }
 }
 
