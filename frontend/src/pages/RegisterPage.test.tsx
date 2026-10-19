@@ -10,12 +10,14 @@ vi.mock('../lib/api', async (importOriginal) => {
   return {
     ...actual,
     registerMember: vi.fn(),
+    checkEmailExists: vi.fn().mockResolvedValue(false),
   }
 })
 
-import { registerMember } from '../lib/api'
+import { registerMember, checkEmailExists } from '../lib/api'
 
 const mockedRegister = vi.mocked(registerMember)
+const mockedCheckEmail = vi.mocked(checkEmailExists)
 
 function renderWithProviders() {
   const queryClient = new QueryClient({
@@ -243,4 +245,22 @@ describe('RegisterPage', () => {
     expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
     expect(passwordInput.className).toContain('border-red-500')
   })
+
+  it('shows duplicate email conflict error and Log in button on blur when email is already taken', async () => {
+    const user = userEvent.setup()
+    mockedCheckEmail.mockResolvedValueOnce(true)
+    renderWithProviders()
+
+    const emailInput = screen.getByLabelText('E-mail address')
+    await user.type(emailInput, 'existing@example.com')
+    await user.tab()
+
+    await waitFor(() => {
+      expect(screen.getByText('An account with this e-mail already exists.')).toBeInTheDocument()
+    })
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true')
+    expect(emailInput.className).toContain('border-red-500')
+    expect(screen.getAllByRole('button', { name: 'Log in' })[0]).toBeInTheDocument()
+  })
 })
+

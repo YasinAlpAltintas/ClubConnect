@@ -36,6 +36,8 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher>(sp =>
             new Argon2PasswordHasher(memorySizeKiB, iterations, parallelism));
 
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
         services.AddDbContext<ClubConnectDbContext>(options =>
         {
             var connectionString = section.GetConnectionString("Default")
