@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseJwt, isTokenExpired, getTokenRemainingTimeMs, type JwtClaims } from './jwt'
+import {
+  parseJwt,
+  isTokenExpired,
+  getTokenRemainingTimeMs,
+  type JwtClaims,
+  getStoredToken,
+  setStoredToken,
+  removeStoredToken,
+  TOKEN_STORAGE_KEY,
+} from './jwt'
 
 function makeTestJwt(claims: JwtClaims): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
@@ -75,5 +84,18 @@ describe('jwt utilities', () => {
     expect(getTokenRemainingTimeMs(expiredToken)).toBe(0)
 
     expect(getTokenRemainingTimeMs('invalid')).toBe(0)
+  })
+
+  it('manages token storage in localStorage', () => {
+    window.localStorage.clear()
+    expect(getStoredToken()).toBeNull()
+
+    setStoredToken('test-token-123')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('test-token-123')
+    expect(getStoredToken()).toBe('test-token-123')
+
+    removeStoredToken()
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+    expect(getStoredToken()).toBeNull()
   })
 })

@@ -21,7 +21,8 @@ export default function LoginPage({
 }: LoginPageProps) {
   const { t, i18n } = useTranslation()
   const [serverError, setServerError] = useState<ResolvedLoginApiError | null>(null)
-  const [expiredNoticeVisible, setExpiredNoticeVisible] = useState(sessionExpired)
+  const [dismissedNotice, setDismissedNotice] = useState(false)
+  const showExpiredNotice = sessionExpired && !dismissedNotice
 
   const {
     register,
@@ -45,7 +46,7 @@ export default function LoginPage({
 
   function onSubmit(data: LoginInput) {
     setServerError(null)
-    setExpiredNoticeVisible(false)
+    setDismissedNotice(true)
     mutation.mutate(data, {
       onSuccess: (result) => {
         onLoginSuccess(result)
@@ -82,7 +83,7 @@ export default function LoginPage({
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-8 space-y-5">
-            {expiredNoticeVisible && (
+            {showExpiredNotice && (
               <div
                 role="alert"
                 className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800"

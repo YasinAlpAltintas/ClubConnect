@@ -59,3 +59,32 @@ export function getTokenRemainingTimeMs(token: string): number {
   const remainingMs = claims.exp * 1000 - Date.now()
   return Math.max(0, remainingMs)
 }
+
+export const TOKEN_STORAGE_KEY = 'clubconnect_token'
+
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setStoredToken(token: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  } catch {
+    // Ignore storage quota or access errors
+  }
+}
+
+export function removeStoredToken(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+  } catch {
+    // Ignore
+  }
+}
