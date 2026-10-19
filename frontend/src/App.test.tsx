@@ -150,6 +150,22 @@ describe('App navigation flows', () => {
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
   })
 
+  it('purges expired token on mount even if hash is #lobby and redirects to login', () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const payload = btoa(JSON.stringify({ exp: 1000, sub: 'mem-stored', email: 'persisted@example.com' })).replace(/=/g, '')
+    const token = `${header}.${payload}.sig`
+
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+    window.location.hash = '#lobby'
+
+    renderApp()
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
+    expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
+    expect(window.location.hash).toBe('#login')
+  })
+
   it('responds to window hashchange events', async () => {
     renderApp()
     expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument()

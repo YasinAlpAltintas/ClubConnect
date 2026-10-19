@@ -34,9 +34,15 @@ function resolveInitialState(
     let resolvedView: AppView =
       initialView ?? (initialMember ? 'lobby' : initialSessionExpired ? 'login' : 'register')
     if (typeof window !== 'undefined') {
-      if (window.location.hash === '#login') resolvedView = 'login'
-      else if (window.location.hash === '#lobby') resolvedView = 'lobby'
-      else if (window.location.hash === '#register') resolvedView = 'register'
+      if (initialSessionExpired) {
+        resolvedView = 'login'
+      } else if (window.location.hash === '#login') {
+        resolvedView = 'login'
+      } else if (window.location.hash === '#lobby') {
+        resolvedView = initialMember ? 'lobby' : 'login'
+      } else if (window.location.hash === '#register') {
+        resolvedView = 'register'
+      }
     }
     return {
       member: initialMember,
@@ -70,16 +76,19 @@ function resolveInitialState(
 
   let view: AppView = initialView ?? 'register'
   if (!initialView) {
-    if (typeof window !== 'undefined' && window.location.hash === '#login') {
+    if (sessionExpired) {
+      view = 'login'
+      if (typeof window !== 'undefined' && window.location.hash !== '#login') {
+        window.location.hash = '#login'
+      }
+    } else if (typeof window !== 'undefined' && window.location.hash === '#login') {
       view = 'login'
     } else if (typeof window !== 'undefined' && window.location.hash === '#lobby') {
-      view = 'lobby'
+      view = member ? 'lobby' : 'login'
     } else if (typeof window !== 'undefined' && window.location.hash === '#register') {
       view = 'register'
     } else if (member) {
       view = 'lobby'
-    } else if (sessionExpired) {
-      view = 'login'
     } else {
       view = 'register'
     }
@@ -144,17 +153,36 @@ export default function App({
     return () => clearTimeout(timer)
   }, [member, view])
 
-  if (view === 'lobby' && member) {
+  if (view === 'lobby') {
+    if (member) {
+      return (
+        <LobbyPage
+          member={member}
+          onLogout={() => {
+            removeStoredToken()
+            setMember(null)
+            setSessionExpired(false)
+            navigateTo('login')
+          }}
+          onSessionExpired={handleExpireSession}
+        />
+      )
+    }
     return (
-      <LobbyPage
-        member={member}
-        onLogout={() => {
-          removeStoredToken()
-          setMember(null)
+      <LoginPage
+        sessionExpired={sessionExpired}
+        onLoginSuccess={(authMember) => {
+          if (authMember.token) {
+            setStoredToken(authMember.token)
+          }
           setSessionExpired(false)
-          navigateTo('login')
+          setMember(authMember)
+          navigateTo('lobby')
         }}
-        onSessionExpired={handleExpireSession}
+        onNavigateToRegister={() => {
+          setSessionExpired(false)
+          navigateTo('register')
+        }}
       />
     )
   }
