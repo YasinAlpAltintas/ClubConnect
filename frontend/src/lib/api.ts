@@ -255,3 +255,30 @@ export async function logoutMember(
   }
 }
 
+export interface ClubDto {
+  id: string
+  name: string
+  description?: string
+  role?: string
+}
+
+export async function getMemberClubs(
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubDto[]> {
+  const res = await fetchFn('/api/auth/me/clubs', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch member clubs (${res.status})`)
+  }
+
+  return (await res.json()) as ClubDto[]
+}
+
+

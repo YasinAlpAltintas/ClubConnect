@@ -50,6 +50,13 @@ public class AuthController(
         string Email,
         bool Exists);
 
+    /// <summary>Summary representation of a club in member club listings.</summary>
+    public sealed record ClubSummaryResponse(
+        Guid Id,
+        string Name,
+        string Description,
+        string Role);
+
     /// <summary>
     /// Authenticates a club member.
     /// 200 → authenticated · 400 → invalid format · 401 → invalid credentials.
@@ -110,6 +117,33 @@ public class AuthController(
         return result.Status switch
         {
             JwtValidationStatus.Valid => Ok(new LoginResponse(result.MemberId!.Value, result.Email!, result.DisplayName ?? string.Empty, token)),
+            JwtValidationStatus.Expired => Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." }),
+            _ => Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." })
+        };
+    }
+
+    /// <summary>
+    /// Retrieves the clubs the authenticated member belongs to.
+    /// In Sprint 1, all members start with an empty club membership list.
+    /// 200 → list of clubs (empty for new members) · 401 → unauthorized.
+    /// </summary>
+    [HttpGet("me/clubs")]
+    [ProducesResponseType(typeof(IEnumerable<ClubSummaryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public IActionResult GetMyClubs()
+    {
+        var authHeader = Request?.Headers?.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var result = _jwtTokenService.ValidateToken(token);
+
+        return result.Status switch
+        {
+            JwtValidationStatus.Valid => Ok(Array.Empty<ClubSummaryResponse>()),
             JwtValidationStatus.Expired => Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." }),
             _ => Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." })
         };
