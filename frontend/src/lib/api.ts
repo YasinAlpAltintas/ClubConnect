@@ -238,3 +238,20 @@ export async function getAuthProfile(
   }
 }
 
+export async function logoutMember(
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<void> {
+  try {
+    await fetchFn('/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+  } catch {
+    // Graceful offline/network failure: client session will still be cleared
+  }
+}
+
