@@ -2,16 +2,23 @@ import { useState, useEffect } from 'react'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import LobbyPage, { type AuthenticatedMember } from './pages/LobbyPage'
+import { getTokenRemainingTimeMs } from './lib/jwt'
 
 export type AppView = 'register' | 'login' | 'lobby'
 
 export interface AppProps {
   initialView?: AppView
   initialMember?: AuthenticatedMember | null
+  initialSessionExpired?: boolean
 }
 
-export default function App({ initialView, initialMember = null }: AppProps = {}) {
+export default function App({
+  initialView,
+  initialMember = null,
+  initialSessionExpired = false,
+}: AppProps = {}) {
   const [member, setMember] = useState<AuthenticatedMember | null>(initialMember)
+  const [sessionExpired, setSessionExpired] = useState(initialSessionExpired)
   const [view, setView] = useState<AppView>(() => {
     if (initialView) return initialView
     if (typeof window !== 'undefined' && window.location.hash === '#login') {
@@ -41,14 +48,35 @@ export default function App({ initialView, initialMember = null }: AppProps = {}
     }
   }
 
+  function handleExpireSession() {
+    setMember(null)
+    setSessionExpired(true)
+    navigateTo('login')
+  }
+
+  useEffect(() => {
+    if (!member?.token || view !== 'lobby') {
+      return
+    }
+
+    const remainingMs = getTokenRemainingTimeMs(member.token)
+    const timer = setTimeout(() => {
+      handleExpireSession()
+    }, remainingMs)
+
+    return () => clearTimeout(timer)
+  }, [member, view])
+
   if (view === 'lobby' && member) {
     return (
       <LobbyPage
         member={member}
         onLogout={() => {
           setMember(null)
+          setSessionExpired(false)
           navigateTo('login')
         }}
+        onSessionExpired={handleExpireSession}
       />
     )
   }
@@ -56,18 +84,26 @@ export default function App({ initialView, initialMember = null }: AppProps = {}
   if (view === 'login') {
     return (
       <LoginPage
+        sessionExpired={sessionExpired}
         onLoginSuccess={(authMember) => {
+          setSessionExpired(false)
           setMember(authMember)
           navigateTo('lobby')
         }}
-        onNavigateToRegister={() => navigateTo('register')}
+        onNavigateToRegister={() => {
+          setSessionExpired(false)
+          navigateTo('register')
+        }}
       />
     )
   }
 
   return (
     <RegisterPage
-      onNavigateToLogin={() => navigateTo('login')}
+      onNavigateToLogin={() => {
+        setSessionExpired(false)
+        navigateTo('login')
+      }}
     />
   )
 }

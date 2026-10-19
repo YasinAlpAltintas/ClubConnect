@@ -5,11 +5,13 @@ export interface AuthenticatedMember {
   memberId: string
   email: string
   displayName?: string | null
+  token?: string
 }
 
 export interface LobbyPageProps {
   member: AuthenticatedMember
   onLogout: () => void
+  onSessionExpired?: () => void
 }
 
 export default function LobbyPage({ member, onLogout }: LobbyPageProps) {

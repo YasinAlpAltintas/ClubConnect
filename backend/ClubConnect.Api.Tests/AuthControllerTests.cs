@@ -132,6 +132,7 @@ public class AuthControllerTests
         Assert.Equal(memberId, response.MemberId);
         Assert.Equal("ada@example.com", response.Email);
         Assert.Equal("Ada Lovelace", response.DisplayName);
+        Assert.False(string.IsNullOrWhiteSpace(response.Token));
     }
 
     [Fact]
@@ -176,4 +177,131 @@ public class AuthControllerTests
 
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
+
+    [Fact]
+    public void GetProfile_MissingAuthHeader_ReturnsUnauthorized()
+    {
+        var controller = CreateController();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        var result = controller.GetProfile();
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetProfile_ValidToken_ReturnsOkWithProfile()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var memberId = Guid.NewGuid();
+        var member = new Member
+        {
+            Id = memberId,
+            Email = "ada@example.com",
+            DisplayName = "Ada Lovelace",
+            PasswordHash = "hash",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var token = jwtService.GenerateToken(member);
+
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, jwtService, _members.Object);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.Request.Headers.Authorization = $"Bearer {token}";
+
+        var result = controller.GetProfile();
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthController.LoginResponse>(okResult.Value);
+        Assert.Equal(memberId, response.MemberId);
+        Assert.Equal("ada@example.com", response.Email);
+    }
+
+    [Fact]
+    public void GetProfile_ExpiredToken_ReturnsUnauthorizedWithTokenExpired()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var member = new Member
+        {
+            Id = Guid.NewGuid(),
+            Email = "ada@example.com",
+            DisplayName = "Ada Lovelace",
+            PasswordHash = "hash",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var token = jwtService.GenerateToken(member, TimeSpan.FromSeconds(-10));
+
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, jwtService, _members.Object);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.Request.Headers.Authorization = $"Bearer {token}";
+
+        var result = controller.GetProfile();
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CheckEmail_EmptyEmail_ReturnsBadRequest()
+    {
+        var controller = CreateController();
+        var result = await controller.CheckEmail("", CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CheckEmail_InvalidFormat_ReturnsBadRequest()
+    {
+        var controller = CreateController();
+        var result = await controller.CheckEmail("not-an-email", CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CheckEmail_ExistingEmail_ReturnsOkWithExistsTrue()
+    {
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, null, _members.Object);
+
+        _members.Setup(m => m.FindByEmailAsync("exists@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Member
+            {
+                Id = Guid.NewGuid(),
+                Email = "exists@example.com",
+                PasswordHash = "hash",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+
+        var result = await controller.CheckEmail("exists@example.com", CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthController.CheckEmailResponse>(okResult.Value);
+        Assert.True(response.Exists);
+        Assert.Equal("exists@example.com", response.Email);
+    }
+
+    [Fact]
+    public async Task CheckEmail_NonExistingEmail_ReturnsOkWithExistsFalse()
+    {
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, null, _members.Object);
+
+        _members.Setup(m => m.FindByEmailAsync("notfound@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Member?)null);
+
+        var result = await controller.CheckEmail("notfound@example.com", CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthController.CheckEmailResponse>(okResult.Value);
+        Assert.False(response.Exists);
+    }
 }
+

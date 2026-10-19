@@ -105,6 +105,7 @@ export interface LoginSuccessResponse {
   memberId: string
   email: string
   displayName?: string | null
+  token: string
 }
 
 export type LoginApiErrorCode = 'invalid_credentials' | 'validation' | 'network'
@@ -184,6 +185,56 @@ export async function loginMember(
     memberId: data.memberId,
     email: data.email,
     displayName: data.displayName,
+    token: data.token,
+  }
+}
+
+export async function checkEmailExists(
+  email: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetchFn(`/api/auth/check-email?email=${encodeURIComponent(email)}`)
+    if (!response.ok) return false
+    const data = (await response.json()) as { exists?: boolean }
+    return Boolean(data.exists)
+  } catch {
+    return false
+  }
+}
+
+export async function getAuthProfile(
+  token: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<LoginSuccessResponse> {
+  let response: Response
+  try {
+    response = await fetchFn('/api/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  } catch {
+    throw new LoginApiException({ code: 'network' })
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    payload = undefined
+  }
+
+  if (!response.ok) {
+    throw new LoginApiException(classifyLoginError(response.status, payload))
+  }
+
+  const data = payload as LoginSuccessResponse
+  return {
+    memberId: data.memberId,
+    email: data.email,
+    displayName: data.displayName,
+    token,
   }
 }
 
