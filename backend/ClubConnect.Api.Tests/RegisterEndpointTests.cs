@@ -79,6 +79,21 @@ public class RegisterEndpointTests : IClassFixture<ApiTestFixture>
     }
 
     [Fact]
+    public async Task Register_PasswordTooShort_ReturnsBadRequest_WithLengthDetail()
+    {
+        using var response = await _fixture.Client.PostAsJsonAsync(RegisterUrl, new
+        {
+            email = UniqueEmail(),
+            password = "short",
+        });
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_input", payload.GetProperty("error").GetString());
+        Assert.Equal("Password must be at least 8 characters long.", payload.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public async Task Register_DuplicateEmail_ReturnsConflict()
     {
         var email = UniqueEmail();

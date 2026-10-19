@@ -211,4 +211,36 @@ describe('RegisterPage', () => {
     expect(screen.getByRole('button', { name: 'Account aanmaken' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument()
   })
+
+  it('shows validation error immediately when tabbing out of an invalid email', async () => {
+    const user = userEvent.setup()
+    renderWithProviders()
+
+    const emailInput = screen.getByLabelText('E-mail address')
+    await user.type(emailInput, 'invalid-email')
+    await user.tab()
+
+    await waitFor(() => {
+      expect(screen.getByText('Enter a valid e-mail address.')).toBeInTheDocument()
+    })
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true')
+    expect(emailInput.className).toContain('border-red-500')
+  })
+
+  it('shows validation error immediately when tabbing out of a short password', async () => {
+    const user = userEvent.setup()
+    renderWithProviders()
+
+    const passwordInput = screen.getByLabelText('Password')
+    await user.type(passwordInput, 'abc')
+    await user.tab()
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Password must be at least 8 characters long.'),
+      ).toBeInTheDocument()
+    })
+    expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
+    expect(passwordInput.className).toContain('border-red-500')
+  })
 })

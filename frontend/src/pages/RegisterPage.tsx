@@ -22,6 +22,7 @@ export default function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
+    mode: 'onTouched',
     defaultValues: { email: '', password: '' },
   })
 
@@ -128,7 +129,11 @@ export default function RegisterPage() {
                 placeholder={t('register.emailPlaceholder')}
                 aria-invalid={Boolean(errors.email || fieldError === 'email')}
                 aria-describedby={errors.email ? 'email-error' : undefined}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+                className={`mt-1 block w-full rounded-lg border px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 ${
+                  errors.email || fieldError === 'email'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/40'
+                    : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/40'
+                }`}
                 {...register('email')}
               />
               {errors.email && (
@@ -150,7 +155,11 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 aria-invalid={Boolean(errors.password || fieldError === 'password')}
                 aria-describedby={errors.password ? 'password-error' : undefined}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+                className={`mt-1 block w-full rounded-lg border px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 ${
+                  errors.password || fieldError === 'password'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/40'
+                    : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/40'
+                }`}
                 {...register('password')}
               />
               {errors.password && (
