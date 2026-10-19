@@ -18,8 +18,9 @@ public class AuthControllerTests
 
     private AuthController CreateController()
     {
-        var useCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
-        return new AuthController(useCase);
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        return new AuthController(registerUseCase, loginUseCase);
     }
 
     [Fact]
@@ -106,5 +107,73 @@ public class AuthControllerTests
         var request = new AuthController.RegisterRequest("ada@example.com", "Passw0rd1!");
 
         await Assert.ThrowsAsync<DbUpdateException>(() => controller.Register(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Login_ValidCredentials_ReturnsOkWithMember()
+    {
+        var controller = CreateController();
+        var memberId = Guid.NewGuid();
+        _members.Setup(m => m.FindByEmailAsync("ada@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Member
+            {
+                Id = memberId,
+                Email = "ada@example.com",
+                DisplayName = "Ada Lovelace",
+                PasswordHash = "valid_argon2_hash"
+            });
+        _hasher.Setup(h => h.Verify("Passw0rd1!", "valid_argon2_hash")).Returns(true);
+
+        var request = new AuthController.LoginRequest("ada@example.com", "Passw0rd1!");
+        var result = await controller.Login(request, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthController.LoginResponse>(okResult.Value);
+        Assert.Equal(memberId, response.MemberId);
+        Assert.Equal("ada@example.com", response.Email);
+        Assert.Equal("Ada Lovelace", response.DisplayName);
+    }
+
+    [Fact]
+    public async Task Login_InvalidInput_ReturnsBadRequest()
+    {
+        var controller = CreateController();
+
+        var request = new AuthController.LoginRequest("not-an-email", "");
+        var result = await controller.Login(request, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Login_UnknownMember_ReturnsUnauthorized()
+    {
+        var controller = CreateController();
+        _members.Setup(m => m.FindByEmailAsync("unknown@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Member?)null);
+
+        var request = new AuthController.LoginRequest("unknown@example.com", "Passw0rd1!");
+        var result = await controller.Login(request, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Login_WrongPassword_ReturnsUnauthorized()
+    {
+        var controller = CreateController();
+        _members.Setup(m => m.FindByEmailAsync("ada@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Member
+            {
+                Id = Guid.NewGuid(),
+                Email = "ada@example.com",
+                PasswordHash = "valid_argon2_hash"
+            });
+        _hasher.Setup(h => h.Verify("WrongPassword!", "valid_argon2_hash")).Returns(false);
+
+        var request = new AuthController.LoginRequest("ada@example.com", "WrongPassword!");
+        var result = await controller.Login(request, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
     }
 }
