@@ -38,9 +38,14 @@ on:
         required: false
         type: string
         default: ''
+      allow_rollback:
+        description: 'Allow deploying an older commit than currently deployed on staging (manual rollback)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: deploy-${{ inputs.environment || 'staging' }}
+  group: ${{ inputs.environment == 'production' && 'clubconnect-production' || 'clubconnect-staging' }}
   cancel-in-progress: false
 
 permissions:
@@ -275,7 +280,8 @@ jobs:
       - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.validate.outputs.commit_sha }}
+          fetch-depth: 0
 
       - name: Configure SSH credentials
         env:
@@ -288,6 +294,51 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify Staging Deployment Ordering
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          TARGET_SHA: ${{ needs.validate.outputs.commit_sha }}
+          ALLOW_ROLLBACK: ${{ inputs.allow_rollback }}
+        run: |
+          set -euo pipefail
+          echo "Checking currently deployed release on ${DEPLOY_HOST}..."
+          current_release_tag=$(ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cat /opt/clubconnect/releases/staging_current.release 2>/dev/null | grep -E '^IMAGE_TAG=' | cut -d '=' -f2 || true")
+
+          if [ -n "$current_release_tag" ]; then
+            current_sha="${current_release_tag#sha-}"
+            echo "Currently deployed release on staging: ${current_sha}"
+            echo "Candidate release to deploy: ${TARGET_SHA}"
+
+            if [ "$current_sha" = "$TARGET_SHA" ]; then
+              echo "Candidate matches currently deployed release (redeploy permitted)."
+            elif git cat-file -e "${current_sha}^{commit}" 2>/dev/null; then
+              if git merge-base --is-ancestor "${TARGET_SHA}" "${current_sha}"; then
+                if [ "$ALLOW_ROLLBACK" = "true" ]; then
+                  echo "WARNING: Target commit ${TARGET_SHA} is an older ancestor of currently deployed ${current_sha}."
+                  echo "Manual rollback explicitly authorized via allow_rollback=true."
+                else
+                  echo "::error::Deployment rejected: Target commit ${TARGET_SHA} is an older ancestor of currently deployed release ${current_sha}." >&2
+                  echo "::error::Deploying an older release would overwrite a newer release. Set 'allow_rollback: true' if this is an intentional manual rollback." >&2
+                  exit 1
+                fi
+              else
+                echo "Release ordering verified: Target commit ${TARGET_SHA} is not an ancestor of ${current_sha}."
+              fi
+            else
+              echo "Note: Current deployed SHA ${current_sha} not found in local git history. Proceeding."
+            fi
+          else
+            echo "No current release metadata found on staging host. Initial deployment."
+          fi
 
       - name: Synchronize versioned release package
         env:
@@ -419,16 +470,40 @@ jobs:
           mkdir -p staging_evidence_download
           artifact_found=false
 
-          # Download evidence artifact from staging run
-          if gh run download --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
-            artifact_found=true
-          else
-            echo "Searching recent workflow runs for staging evidence artifact..."
-            runs=$(gh run list --workflow deploy.yml --status success --json databaseId -q '.[].databaseId' --limit 20 || true)
-            for run_id in $runs; do
+          # 1. Search runs directly matching the commit SHA (across ci.yml, deploy.yml, or any workflow)
+          echo "Searching workflow runs associated with commit $COMMIT_SHA..."
+          matching_runs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${COMMIT_SHA}&status=success" --jq '.workflow_runs[].id' 2>/dev/null || true)
+          for run_id in $matching_runs; do
+            echo "Checking commit-associated run $run_id for staging-evidence-${COMMIT_SHA}..."
+            if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
+              artifact_found=true
+              echo "Found staging evidence in commit-associated workflow run $run_id"
+              break
+            fi
+          done
+
+          # 2. Query repository artifacts directly for 'staging-evidence-${COMMIT_SHA}'
+          if [ "$artifact_found" != "true" ]; then
+            echo "Querying repository artifacts directly for staging-evidence-${COMMIT_SHA}..."
+            artifact_run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=staging-evidence-${COMMIT_SHA}" --jq '.artifacts[0].workflow_run.id // empty' 2>/dev/null || true)
+            if [ -n "$artifact_run_id" ]; then
+              echo "Found artifact in run $artifact_run_id. Downloading..."
+              if gh run download "$artifact_run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
+                artifact_found=true
+                echo "Successfully retrieved staging evidence from run $artifact_run_id"
+              fi
+            fi
+          fi
+
+          # 3. Fallback search across recent successful runs of both ci.yml and deploy.yml
+          if [ "$artifact_found" != "true" ]; then
+            echo "Searching recent successful runs of ci.yml and deploy.yml..."
+            ci_runs=$(gh run list --workflow ci.yml --status success --json databaseId -q '.[].databaseId' --limit 25 2>/dev/null || true)
+            deploy_runs=$(gh run list --workflow deploy.yml --status success --json databaseId -q '.[].databaseId' --limit 25 2>/dev/null || true)
+            for run_id in $ci_runs $deploy_runs; do
               if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
                 artifact_found=true
-                echo "Found staging evidence in workflow run $run_id"
+                echo "Found staging evidence in recent workflow run $run_id"
                 break
               fi
             done
@@ -470,7 +545,7 @@ jobs:
       - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.validate.outputs.commit_sha }}
 
       - name: Configure SSH credentials
         env:
