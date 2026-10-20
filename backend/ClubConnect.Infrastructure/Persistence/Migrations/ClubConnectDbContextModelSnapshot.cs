@@ -22,6 +22,29 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ClubConnect.Domain.Entities.Club", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Clubs", (string)null);
+                });
+
             modelBuilder.Entity("ClubConnect.Domain.Entities.Member", b =>
                 {
                     b.Property<Guid>("Id")
@@ -53,6 +76,66 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_Members_Email");
 
                     b.ToTable("Members", (string)null);
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.Membership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("JoinedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("ClubId", "MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Memberships_ClubId_MemberId");
+
+                    b.ToTable("Memberships", (string)null);
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.Membership", b =>
+                {
+                    b.HasOne("ClubConnect.Domain.Entities.Club", "Club")
+                        .WithMany("Memberships")
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClubConnect.Domain.Entities.Member", "Member")
+                        .WithMany("Memberships")
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Club");
+
+                    b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.Club", b =>
+                {
+                    b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.Member", b =>
+                {
+                    b.Navigation("Memberships");
                 });
 #pragma warning restore 612, 618
         }

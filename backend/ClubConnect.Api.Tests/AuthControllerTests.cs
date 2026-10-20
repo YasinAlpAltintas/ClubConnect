@@ -315,7 +315,7 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public void GetMyClubs_WithValidToken_Returns200WithEmptyClubsList()
+    public async Task GetMyClubs_WithValidToken_Returns200WithEmptyClubsList()
     {
         var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
         var member = new Member
@@ -335,7 +335,7 @@ public class AuthControllerTests
         };
         controller.Request.Headers.Authorization = $"Bearer {token}";
 
-        var result = controller.GetMyClubs();
+        var result = await controller.GetMyClubs();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
@@ -344,20 +344,20 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public void GetMyClubs_WithoutAuthorizationHeader_Returns401Unauthorized()
+    public async Task GetMyClubs_WithoutAuthorizationHeader_Returns401Unauthorized()
     {
         var controller = CreateController();
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         };
-        var result = controller.GetMyClubs();
+        var result = await controller.GetMyClubs();
 
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 
     [Fact]
-    public void GetMyClubs_WithExpiredToken_Returns401TokenExpired()
+    public async Task GetMyClubs_WithExpiredToken_Returns401TokenExpired()
     {
         var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
         var member = new Member
@@ -379,12 +379,12 @@ public class AuthControllerTests
         };
         controller.Request.Headers.Authorization = $"Bearer {expiredToken}";
 
-        var result = controller.GetMyClubs();
+        var result = await controller.GetMyClubs();
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 
     [Fact]
-    public void GetMyClubs_WithInvalidToken_Returns401InvalidToken()
+    public async Task GetMyClubs_WithInvalidToken_Returns401InvalidToken()
     {
         var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
         var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
@@ -396,8 +396,7 @@ public class AuthControllerTests
         };
         controller.Request.Headers.Authorization = "Bearer malformed.invalid.token";
 
-        var result = controller.GetMyClubs();
+        var result = await controller.GetMyClubs();
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 }
-
