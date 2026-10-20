@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type SupportedLanguage } from '../i18n'
-import { getMemberClubs, type ClubDto } from '../lib/api'
+import {
+  getMemberClubs,
+  createClub,
+  CreateClubApiException,
+  type ClubDto,
+} from '../lib/api'
+import { createClubSchema } from '../schemas/club'
 
 export interface AuthenticatedMember {
   memberId: string
@@ -23,13 +29,23 @@ type ModalType = 'explore' | 'create' | null
 export default function LobbyPage({
   member,
   onLogout,
+  onSessionExpired,
   initialClubs,
 }: LobbyPageProps) {
   const { t, i18n } = useTranslation()
+  const queryClient = useQueryClient()
+
   const [modalType, setModalType] = useState<ModalType>(null)
   const [inviteCode, setInviteCode] = useState('')
   const [codeSubmitted, setCodeSubmitted] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
+
+  // Create club form state
+  const [clubName, setClubName] = useState('')
+  const [clubDescription, setClubDescription] = useState('')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   const { data: clubs = initialClubs ?? [], isLoading } = useQuery<ClubDto[]>({
     queryKey: ['memberClubs', member.token],
@@ -52,6 +68,67 @@ export default function LobbyPage({
     }
     setCodeError(null)
     setCodeSubmitted(true)
+  }
+
+  function closeModal() {
+    if (isCreating) return
+    setModalType(null)
+    setClubName('')
+    setClubDescription('')
+    setNameError(null)
+    setFormError(null)
+  }
+
+  async function handleCreateClubSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setNameError(null)
+    setFormError(null)
+
+    const parsed = createClubSchema.safeParse({
+      name: clubName,
+      description: clubDescription || undefined,
+    })
+
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      const errorKey = issue?.message ?? 'required'
+      setNameError(t(`lobby.createModal.errors.${errorKey}`, { defaultValue: errorKey }))
+      return
+    }
+
+    setIsCreating(true)
+
+    try {
+      await createClub(
+        {
+          name: parsed.data.name,
+          description: parsed.data.description,
+        },
+        member.token,
+      )
+
+      await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+
+      setModalType(null)
+      setClubName('')
+      setClubDescription('')
+      setNameError(null)
+      setFormError(null)
+    } catch (err: unknown) {
+      if (err instanceof CreateClubApiException) {
+        if (err.apiError.code === 'validation') {
+          setNameError(err.apiError.message ?? t('lobby.createModal.errors.required'))
+        } else if (err.apiError.code === 'unauthorized') {
+          onSessionExpired?.()
+        } else {
+          setFormError(t('lobby.createModal.apiError'))
+        }
+      } else {
+        setFormError(t('lobby.createModal.apiError'))
+      }
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
@@ -135,9 +212,21 @@ export default function LobbyPage({
             <h2 className="text-xl font-bold text-slate-900">
               {t('lobby.myClubs')}
             </h2>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {clubs.length} {clubs.length === 1 ? 'club' : 'clubs'}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {clubs.length} {clubs.length === 1 ? 'club' : 'clubs'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setModalType('create')}
+                className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer"
+              >
+                <svg className="mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                {t('lobby.createNewClub')}
+              </button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -321,8 +410,8 @@ export default function LobbyPage({
         </section>
       </div>
 
-      {/* Info Dialog Modal */}
-      {modalType && (
+      {/* Explore Dialog Modal */}
+      {modalType === 'explore' && (
         <div
           role="dialog"
           aria-modal="true"
@@ -330,24 +419,127 @@ export default function LobbyPage({
         >
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
             <h3 className="text-lg font-bold text-slate-900">
-              {modalType === 'explore'
-                ? t('lobby.empty.dialogExploreTitle')
-                : t('lobby.empty.dialogCreateTitle')}
+              {t('lobby.empty.dialogExploreTitle')}
             </h3>
             <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-              {modalType === 'explore'
-                ? t('lobby.empty.dialogExploreMessage')
-                : t('lobby.empty.dialogCreateMessage')}
+              {t('lobby.empty.dialogExploreMessage')}
             </p>
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
-                onClick={() => setModalType(null)}
+                onClick={closeModal}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 cursor-pointer"
               >
                 {t('lobby.empty.dialogClose')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Club Modal */}
+      {modalType === 'create' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-club-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200 sm:p-8">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 id="create-club-title" className="text-xl font-bold tracking-tight text-slate-900">
+                  {t('lobby.createModal.title')}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {t('lobby.createModal.subtitle')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isCreating}
+                aria-label="Close"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 cursor-pointer"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateClubSubmit} className="mt-6 space-y-4">
+              {formError && (
+                <div role="alert" className="rounded-xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200">
+                  {formError}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="club-name" className="block text-sm font-medium text-slate-700">
+                  {t('lobby.createModal.nameLabel')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="club-name"
+                  value={clubName}
+                  onChange={(e) => {
+                    setClubName(e.target.value)
+                    if (nameError) setNameError(null)
+                  }}
+                  disabled={isCreating}
+                  placeholder={t('lobby.createModal.namePlaceholder')}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? 'club-name-error' : undefined}
+                  className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100 disabled:text-slate-500"
+                />
+                {nameError && (
+                  <p id="club-name-error" role="alert" className="mt-1.5 text-xs font-medium text-red-600">
+                    {nameError}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="club-description" className="block text-sm font-medium text-slate-700">
+                  {t('lobby.createModal.descLabel')}
+                </label>
+                <textarea
+                  id="club-description"
+                  rows={3}
+                  value={clubDescription}
+                  onChange={(e) => setClubDescription(e.target.value)}
+                  disabled={isCreating}
+                  placeholder={t('lobby.createModal.descPlaceholder')}
+                  className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100 disabled:text-slate-500"
+                />
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isCreating}
+                  className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
+                >
+                  {t('lobby.createModal.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60 cursor-pointer"
+                >
+                  {isCreating ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                      {t('lobby.createModal.submitting')}
+                    </>
+                  ) : (
+                    t('lobby.createModal.submit')
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

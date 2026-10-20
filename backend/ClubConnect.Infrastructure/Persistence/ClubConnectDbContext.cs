@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace ClubConnect.Infrastructure.Persistence;
 
 /// <summary>
-/// EF Core context for ClubConnect. Owns the <see cref="Members"/> table and
-/// enforces the unique index on canonical e-mail at the schema level.
+/// EF Core context for ClubConnect. Owns the <see cref="Members"/>, <see cref="Clubs"/>,
+/// and <see cref="Memberships"/> tables and enforces relational constraints.
 /// </summary>
 public class ClubConnectDbContext : DbContext
 {
@@ -15,6 +15,10 @@ public class ClubConnectDbContext : DbContext
     }
 
     public DbSet<Member> Members => Set<Member>();
+
+    public DbSet<Club> Clubs => Set<Club>();
+
+    public DbSet<Membership> Memberships => Set<Membership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +49,51 @@ public class ClubConnectDbContext : DbContext
             entity.HasIndex(m => m.Email)
                 .IsUnique()
                 .HasDatabaseName("IX_Members_Email");
+        });
+
+        modelBuilder.Entity<Club>(entity =>
+        {
+            entity.ToTable("Clubs");
+
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(c => c.Description)
+                .HasMaxLength(500);
+
+            entity.Property(c => c.CreatedAtUtc)
+                .IsRequired();
+
+            entity.HasMany(c => c.Memberships)
+                .WithOne(m => m.Club)
+                .HasForeignKey(m => m.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Membership>(entity =>
+        {
+            entity.ToTable("Memberships");
+
+            entity.HasKey(m => m.Id);
+
+            entity.Property(m => m.Role)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(m => m.JoinedAtUtc)
+                .IsRequired();
+
+            entity.HasOne(m => m.Member)
+                .WithMany(mem => mem.Memberships)
+                .HasForeignKey(m => m.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(m => new { m.ClubId, m.MemberId })
+                .IsUnique()
+                .HasDatabaseName("IX_Memberships_ClubId_MemberId");
         });
     }
 }

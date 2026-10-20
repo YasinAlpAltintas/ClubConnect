@@ -66,6 +66,25 @@
     "logout": "Uitloggen",
     "myClubs": "Mijn Clubs",
     "loading": "Je clubs worden geladen…",
+    "createNewClub": "Nieuwe club oprichten",
+    "createModal": {
+      "title": "Nieuwe club oprichten",
+      "subtitle": "Start een nieuwe clubomgeving. Je wordt automatisch aangesteld als Clubbeheerder.",
+      "nameLabel": "Clubnaam",
+      "namePlaceholder": "bijv. Leuven Coding Society",
+      "descLabel": "Beschrijving (optioneel)",
+      "descPlaceholder": "Beschrijf kort het doel en de activiteiten van de club",
+      "submit": "Club aanmaken",
+      "submitting": "Club wordt aangemaakt…",
+      "cancel": "Annuleren",
+      "errors": {
+        "required": "Clubnaam is verplicht.",
+        "name_min": "Clubnaam moet minstens 2 tekens bevatten.",
+        "name_max": "Clubnaam mag maximaal 100 tekens bevatten.",
+        "desc_max": "Beschrijving mag maximaal 500 tekens bevatten."
+      },
+      "apiError": "Kan club niet aanmaken. Probeer opnieuw."
+    },
     "empty": {
       "badge": "Nog geen clubs",
       "title": "Je bent nog geen lid van een club",
@@ -79,7 +98,7 @@
       "codeError": "Vul een geldige uitnodigingscode in.",
       "dialogExploreTitle": "Clubverkenning",
       "dialogExploreMessage": "Clubverkenning en het cluboverzicht komen beschikbaar in Sprint 2! Je kunt dan filteren op interesses, campus en activiteiten.",
-      "dialogCreateTitle": "Een nieuwe club oprichten",
+      "dialogCreateTitle": "Nieuwe club oprichten",
       "dialogCreateMessage": "Voor het oprichten van een club zijn minstens 3 oprichters en erkenning nodig. Aanvragen openen komende sprint.",
       "dialogClose": "Begrepen",
       "stepsTitle": "Hoe ga je aan de slag?",

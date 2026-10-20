@@ -48,7 +48,7 @@ test.describe('INC-10: Empty Lobby with Clear Calls-to-Action', () => {
 
     // Confirm CTAs exist and are visible
     await expect(emptyState.getByRole('button', { name: /Explore Clubs|Ontdek clubs/ })).toBeVisible()
-    await expect(emptyState.getByRole('button', { name: /Register a Club|Club oprichten/ })).toBeVisible()
+    await expect(emptyState.getByRole('button', { name: /Create New Club|Register a Club|Club oprichten/i })).toBeVisible()
     await expect(emptyState.getByRole('button', { name: /Join Club|Deelnemen/ })).toBeVisible()
     await expect(emptyState.getByPlaceholder(/CLUB-2026/)).toBeVisible()
 
@@ -83,12 +83,12 @@ test.describe('INC-10: Empty Lobby with Clear Calls-to-Action', () => {
     await expect(dialog).not.toBeVisible()
 
     // 2. Open Register a Club modal
-    await page.getByRole('button', { name: /Register a Club|Club oprichten/ }).click()
+    await page.getByRole('button', { name: /Create New Club|Register a Club|Club oprichten/i }).first().click()
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('heading', { level: 3 })).toHaveText(/Register a New Club|Een nieuwe club oprichten/)
+    await expect(dialog.getByRole('heading', { level: 3 })).toHaveText(/Create New Club|Register a New Club|Een nieuwe club oprichten|Nieuwe club oprichten/i)
 
-    // Close modal
-    await dialog.getByRole('button', { name: /Got it|Begrepen/ }).click()
+    // Close modal via Cancel button or close icon
+    await dialog.getByRole('button', { name: /Cancel|Annuleren|Got it|Begrepen/i }).click()
     await expect(dialog).not.toBeVisible()
   })
 

@@ -17,7 +17,8 @@ public class AuthController(
     RegisterMemberUseCase registerMemberUseCase,
     LoginMemberUseCase loginMemberUseCase,
     IJwtTokenService? jwtTokenService = null,
-    IMemberRepository? memberRepository = null) : ControllerBase
+    IMemberRepository? memberRepository = null,
+    IClubRepository? clubRepository = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -124,13 +125,12 @@ public class AuthController(
 
     /// <summary>
     /// Retrieves the clubs the authenticated member belongs to.
-    /// In Sprint 1, all members start with an empty club membership list.
-    /// 200 → list of clubs (empty for new members) · 401 → unauthorized.
+    /// 200 → list of clubs (empty for members with no clubs) · 401 → unauthorized.
     /// </summary>
     [HttpGet("me/clubs")]
     [ProducesResponseType(typeof(IEnumerable<ClubSummaryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public IActionResult GetMyClubs()
+    public async Task<IActionResult> GetMyClubs(CancellationToken cancellationToken = default)
     {
         var authHeader = Request?.Headers?.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -141,12 +141,29 @@ public class AuthController(
         var token = authHeader["Bearer ".Length..].Trim();
         var result = _jwtTokenService.ValidateToken(token);
 
-        return result.Status switch
+        if (result.Status == JwtValidationStatus.Expired)
         {
-            JwtValidationStatus.Valid => Ok(Array.Empty<ClubSummaryResponse>()),
-            JwtValidationStatus.Expired => Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." }),
-            _ => Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." })
-        };
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (result.Status != JwtValidationStatus.Valid || result.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (clubRepository is null)
+        {
+            return Ok(Array.Empty<ClubSummaryResponse>());
+        }
+
+        var memberships = await clubRepository.GetClubsForMemberAsync(result.MemberId.Value, cancellationToken).ConfigureAwait(false);
+        var response = memberships.Select(m => new ClubSummaryResponse(
+            m.Id,
+            m.Name,
+            m.Description ?? string.Empty,
+            m.Role));
+
+        return Ok(response);
     }
 
     /// <summary>

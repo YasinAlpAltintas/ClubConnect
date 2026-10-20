@@ -281,4 +281,84 @@ export async function getMemberClubs(
   return (await res.json()) as ClubDto[]
 }
 
+export interface CreateClubRequest {
+  name: string
+  description?: string
+}
 
+export type CreateClubApiError =
+  | { code: 'validation'; message?: string }
+  | { code: 'unauthorized' }
+  | { code: 'network' }
+  | { code: 'unexpected'; status: number }
+
+export class CreateClubApiException extends Error {
+  readonly apiError: CreateClubApiError
+
+  constructor(apiError: CreateClubApiError) {
+    super(CreateClubApiException.messageFor(apiError))
+    this.name = 'CreateClubApiException'
+    this.apiError = apiError
+  }
+
+  private static messageFor(apiError: CreateClubApiError): string {
+    if (apiError.code === 'validation') {
+      return apiError.message ?? 'validation_failed'
+    }
+    if (apiError.code === 'unauthorized') {
+      return 'unauthorized'
+    }
+    if (apiError.code === 'network') {
+      return 'network'
+    }
+    return String(apiError.status)
+  }
+}
+
+export async function createClub(
+  request: CreateClubRequest,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubDto> {
+  let response: Response
+  try {
+    response = await fetchFn('/api/clubs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new CreateClubApiException({ code: 'network' })
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    payload = undefined
+  }
+
+  if (response.status === 401) {
+    throw new CreateClubApiException({ code: 'unauthorized' })
+  }
+
+  if (response.status === 400) {
+    const message = extractErrorString(payload)
+    throw new CreateClubApiException({ code: 'validation', message })
+  }
+
+  if (!response.ok) {
+    throw new CreateClubApiException({ code: 'unexpected', status: response.status })
+  }
+
+  const data = payload as { id: string; name: string; description?: string; role: string }
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    role: data.role,
+  }
+}

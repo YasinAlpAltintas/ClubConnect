@@ -10,6 +10,8 @@ import {
   getAuthProfile,
   logoutMember,
   getMemberClubs,
+  createClub,
+  CreateClubApiException,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -447,3 +449,81 @@ describe('getMemberClubs', () => {
 })
 
 
+
+describe('createClub', () => {
+  it('calls POST /api/clubs with authorization header and returns created club', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+
+    const dummyCreated = {
+      id: 'club-new-1',
+      name: 'Leuven Coding Society',
+      description: 'Campus developers',
+      role: 'Club Admin',
+    }
+
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      capturedUrl = String(url)
+      capturedInit = init
+      return jsonResponse(dummyCreated, 201)
+    }) as typeof fetch
+
+    const result = await createClub(
+      { name: 'Leuven Coding Society', description: 'Campus developers' },
+      'user-jwt-token',
+      fetchFn,
+    )
+
+    expect(capturedUrl).toBe('/api/clubs')
+    expect(capturedInit?.method).toBe('POST')
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBe('Bearer user-jwt-token')
+    expect(capturedInit?.body).toBe(JSON.stringify({ name: 'Leuven Coding Society', description: 'Campus developers' }))
+    expect(result).toEqual(dummyCreated)
+  })
+
+  it('throws CreateClubApiException with unauthorized on 401', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'unauthorized' }, 401)) as typeof fetch
+    await expect(
+      createClub({ name: 'Valid Club' }, 'bad-token', fetchFn),
+    ).rejects.toMatchObject({
+      apiError: { code: 'unauthorized' },
+    })
+  })
+
+  it('throws CreateClubApiException with validation on 400', async () => {
+    const fetchFn = (async () =>
+      jsonResponse({ error: 'invalid_input', detail: 'Club name is required.' }, 400)) as typeof fetch
+
+    await expect(
+      createClub({ name: '' }, 'token', fetchFn),
+    ).rejects.toMatchObject({
+      apiError: { code: 'validation', message: 'Club name is required.' },
+    })
+  })
+
+  it('throws CreateClubApiException network error when fetch rejects', async () => {
+    const fetchFn = (async () => {
+      throw new TypeError('Failed to fetch')
+    }) as typeof fetch
+
+    await expect(
+      createClub({ name: 'Valid Club' }, 'token', fetchFn),
+    ).rejects.toThrow(CreateClubApiException)
+
+    await expect(
+      createClub({ name: 'Valid Club' }, 'token', fetchFn),
+    ).rejects.toMatchObject({
+      apiError: { code: 'network' },
+    })
+  })
+
+  it('throws CreateClubApiException with unexpected status on 500', async () => {
+    const fetchFn = (async () => jsonResponse({}, 500)) as typeof fetch
+
+    await expect(
+      createClub({ name: 'Valid Club' }, 'token', fetchFn),
+    ).rejects.toMatchObject({
+      apiError: { code: 'unexpected', status: 500 },
+    })
+  })
+})

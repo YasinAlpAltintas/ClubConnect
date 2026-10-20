@@ -18,4 +18,7 @@ public class Member
     public string DisplayName { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; init; }
+
+    /// <summary>Memberships held by this member across various clubs.</summary>
+    public ICollection<Membership> Memberships { get; set; } = new List<Membership>();
 }
