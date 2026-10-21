@@ -256,7 +256,7 @@ jobs:
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/develop' &&
-      github.repository == 'yasinalpaltintas/ClubConnect'
+      (github.repository == 'yasinalpaltintas/ClubConnect' || github.repository == 'YasinAlpAltintas/ClubConnect')
 
     permissions:
       contents: read
@@ -326,7 +326,8 @@ jobs:
 
     if: >-
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/develop'
+      github.ref == 'refs/heads/develop' &&
+      (github.repository == 'yasinalpaltintas/ClubConnect' || github.repository == 'YasinAlpAltintas/ClubConnect')
 
     environment: staging
 
@@ -389,3 +390,197 @@ jobs:
         run: |
           echo "GitHub Actions connected to NON-PROD."
           echo "Docker Compose verification passed."
+
+  # ==========================================
+  # 7. NON-PROD - AUTOMATIC STAGING DEPLOYMENT
+  # ==========================================
+  deploy-staging:
+    name: Deploy to Staging (CC-NPR)
+    runs-on: ubuntu-latest
+
+    needs:
+      - publish-images
+      - staging-compose-test
+
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      (github.repository == 'yasinalpaltintas/ClubConnect' || github.repository == 'YasinAlpAltintas/ClubConnect')
+
+    environment: staging
+
+    concurrency:
+      group: clubconnect-staging
+      cancel-in-progress: false
+
+    steps:
+      - name: Validate Staging Secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_HOST:-}" ] || [ -z "${DEPLOY_USER:-}" ] || [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+            echo "::error::Required staging secrets (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS) are missing in environment 'staging'." >&2
+            exit 1
+          fi
+          echo "All required staging secrets verified present."
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH credentials
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify Staging Deployment Ordering
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "Checking currently deployed release on ${DEPLOY_HOST}..."
+          current_release_tag=$(ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cat /opt/clubconnect/releases/staging_current.release 2>/dev/null | grep -E '^IMAGE_TAG=' | cut -d '=' -f2 || true")
+
+          if [ -n "$current_release_tag" ]; then
+            current_sha="${current_release_tag#sha-}"
+            echo "Currently deployed release on staging: ${current_sha}"
+            echo "Candidate release to deploy: ${TARGET_SHA}"
+
+            if [ "$current_sha" = "$TARGET_SHA" ]; then
+              echo "Candidate matches currently deployed release (redeploy permitted)."
+            elif git cat-file -e "${current_sha}^{commit}" 2>/dev/null; then
+              if git merge-base --is-ancestor "${TARGET_SHA}" "${current_sha}"; then
+                echo "::error::Deployment rejected: Target commit ${TARGET_SHA} is an older ancestor of currently deployed release ${current_sha}." >&2
+                echo "::error::An older CI run cannot overwrite a newer release. Automatic deployment aborted." >&2
+                exit 1
+              else
+                echo "Release ordering verified: Target commit ${TARGET_SHA} is not an ancestor of ${current_sha}."
+              fi
+            else
+              echo "Note: Current deployed SHA ${current_sha} not found in local git history. Proceeding with deployment."
+            fi
+          else
+            echo "No current release metadata found on staging host. Initial deployment."
+          fi
+
+      - name: Synchronize versioned release package
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Creating versioned release directory on ${DEPLOY_HOST}: /opt/clubconnect/releases/${COMMIT_SHA}..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '/opt/clubconnect/releases/${COMMIT_SHA}/scripts' '/opt/clubconnect/releases/${COMMIT_SHA}/deploy'"
+
+          echo "Uploading release scripts and Compose templates..."
+          tar -czf - scripts deploy | ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "tar -xzf - -C '/opt/clubconnect/releases/${COMMIT_SHA}/'"
+
+      - name: Execute staging deployment
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ github.sha }}
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Executing versioned deploy.sh on ${DEPLOY_HOST}..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "COMMIT_SHA='$COMMIT_SHA' IMAGE_TAG='$IMAGE_TAG' bash -se" <<'EOF'
+          set -euo pipefail
+          chmod +x "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/"*.sh
+          "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/deploy.sh" staging "${IMAGE_TAG}"
+          EOF
+
+      - name: Retrieve staging deployment evidence
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Retrieving verified staging deployment evidence..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cat '/opt/clubconnect/releases/${COMMIT_SHA}/staging_evidence.json'" > staging_evidence.json
+
+          cat staging_evidence.json
+
+          # Validate staging evidence integrity
+          evidence_commit=$(jq -r '.commit_sha // empty' staging_evidence.json)
+          evidence_smoke=$(jq -r '.smoke_test // empty' staging_evidence.json)
+          frontend_digest=$(jq -r '.frontend_digest // empty' staging_evidence.json)
+          backend_digest=$(jq -r '.backend_digest // empty' staging_evidence.json)
+
+          if [ "$evidence_commit" != "$COMMIT_SHA" ]; then
+            echo "::error::Staging evidence commit ($evidence_commit) does not match requested commit ($COMMIT_SHA)." >&2
+            exit 1
+          fi
+
+          if [ "$evidence_smoke" != "PASSED" ]; then
+            echo "::error::Staging smoke test did not pass (status: $evidence_smoke)." >&2
+            exit 1
+          fi
+
+          if [ -z "$frontend_digest" ] || [ -z "$backend_digest" ]; then
+            echo "::error::Staging evidence does not contain verified image digests." >&2
+            exit 1
+          fi
+
+          echo "Staging deployment and smoke tests verified successfully for commit $COMMIT_SHA."
+
+      - name: Upload staging evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-evidence-${{ github.sha }}
+          path: staging_evidence.json
+          retention-days: 30
