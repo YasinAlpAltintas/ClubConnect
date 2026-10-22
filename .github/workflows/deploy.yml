@@ -459,6 +459,11 @@ jobs:
           fi
           echo "Production manual confirmation input validated."
 
+      - name: Checkout deployment repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Retrieve & Verify Staging Evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -470,44 +475,27 @@ jobs:
           mkdir -p staging_evidence_download
           artifact_found=false
 
-          # 1. Search runs directly matching the commit SHA (across ci.yml, deploy.yml, or any workflow)
-          echo "Searching workflow runs associated with commit $COMMIT_SHA..."
-          matching_runs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${COMMIT_SHA}&status=success" --jq '.workflow_runs[].id' 2>/dev/null || true)
-          for run_id in $matching_runs; do
-            echo "Checking commit-associated run $run_id for staging-evidence-${COMMIT_SHA}..."
-            if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
+          # Locate staging evidence from a successful run of this workflow.
+          # Always specify the repository; do not rely on runner working directory.
+          echo "Searching successful deployment runs for staging evidence..."
+          runs=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy.yml \
+            --status success \
+            --json databaseId \
+            --jq '.[].databaseId' \
+            --limit 100)
+
+          for run_id in $runs; do
+            if gh run download "$run_id" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "staging-evidence-${COMMIT_SHA}" \
+              --dir staging_evidence_download 2>/dev/null; then
               artifact_found=true
-              echo "Found staging evidence in commit-associated workflow run $run_id"
+              echo "Found staging evidence in workflow run $run_id"
               break
             fi
           done
-
-          # 2. Query repository artifacts directly for 'staging-evidence-${COMMIT_SHA}'
-          if [ "$artifact_found" != "true" ]; then
-            echo "Querying repository artifacts directly for staging-evidence-${COMMIT_SHA}..."
-            artifact_run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=staging-evidence-${COMMIT_SHA}" --jq '.artifacts[0].workflow_run.id // empty' 2>/dev/null || true)
-            if [ -n "$artifact_run_id" ]; then
-              echo "Found artifact in run $artifact_run_id. Downloading..."
-              if gh run download "$artifact_run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
-                artifact_found=true
-                echo "Successfully retrieved staging evidence from run $artifact_run_id"
-              fi
-            fi
-          fi
-
-          # 3. Fallback search across recent successful runs of both ci.yml and deploy.yml
-          if [ "$artifact_found" != "true" ]; then
-            echo "Searching recent successful runs of ci.yml and deploy.yml..."
-            ci_runs=$(gh run list --workflow ci.yml --status success --json databaseId -q '.[].databaseId' --limit 25 2>/dev/null || true)
-            deploy_runs=$(gh run list --workflow deploy.yml --status success --json databaseId -q '.[].databaseId' --limit 25 2>/dev/null || true)
-            for run_id in $ci_runs $deploy_runs; do
-              if gh run download "$run_id" --name "staging-evidence-${COMMIT_SHA}" --dir staging_evidence_download 2>/dev/null; then
-                artifact_found=true
-                echo "Found staging evidence in recent workflow run $run_id"
-                break
-              fi
-            done
-          fi
 
           if [ "$artifact_found" != "true" ] || [ ! -f staging_evidence_download/staging_evidence.json ]; then
             echo "::error::No verified staging deployment evidence found for commit $COMMIT_SHA." >&2
