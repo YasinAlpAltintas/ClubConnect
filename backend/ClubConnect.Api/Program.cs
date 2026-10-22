@@ -1,6 +1,9 @@
+using System.Threading.RateLimiting;
 using ClubConnect.Application;
+using ClubConnect.Application.Abstractions;
 using ClubConnect.Infrastructure;
 using ClubConnect.Infrastructure.Persistence;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +12,38 @@ builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("invite-code-policy", httpContext =>
+    {
+        string partitionKey;
+        var authHeader = httpContext.Request.Headers.Authorization.ToString();
+        if (!string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            var token = authHeader["Bearer ".Length..].Trim();
+            var jwtService = httpContext.RequestServices.GetService<IJwtTokenService>();
+            var validation = jwtService?.ValidateToken(token);
+            partitionKey = validation?.MemberId?.ToString()
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "anonymous";
+        }
+        else
+        {
+            partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+    });
+});
 
 var allowedOrigins = builder.Configuration
     .GetSection("ClubConnect:Cors:AllowedOrigins").Get<string[]>()
@@ -38,6 +73,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
 app.MapControllers();

@@ -5,7 +5,7 @@ namespace ClubConnect.Infrastructure.Persistence;
 
 /// <summary>
 /// EF Core context for ClubConnect. Owns the <see cref="Members"/>, <see cref="Clubs"/>,
-/// and <see cref="Memberships"/> tables and enforces relational constraints.
+/// <see cref="Memberships"/>, and <see cref="ClubInvites"/> tables and enforces relational constraints.
 /// </summary>
 public class ClubConnectDbContext : DbContext
 {
@@ -19,6 +19,8 @@ public class ClubConnectDbContext : DbContext
     public DbSet<Club> Clubs => Set<Club>();
 
     public DbSet<Membership> Memberships => Set<Membership>();
+
+    public DbSet<ClubInvite> ClubInvites => Set<ClubInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +73,11 @@ public class ClubConnectDbContext : DbContext
                 .WithOne(m => m.Club)
                 .HasForeignKey(m => m.ClubId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(c => c.Invites)
+                .WithOne(i => i.Club)
+                .HasForeignKey(i => i.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Membership>(entity =>
@@ -94,6 +101,30 @@ public class ClubConnectDbContext : DbContext
             entity.HasIndex(m => new { m.ClubId, m.MemberId })
                 .IsUnique()
                 .HasDatabaseName("IX_Memberships_ClubId_MemberId");
+        });
+
+        modelBuilder.Entity<ClubInvite>(entity =>
+        {
+            entity.ToTable("ClubInvites");
+
+            entity.HasKey(i => i.Id);
+
+            entity.Property(i => i.Code)
+                .IsRequired()
+                .HasMaxLength(6);
+
+            entity.Property(i => i.CreatedAtUtc)
+                .IsRequired();
+
+            entity.Property(i => i.IsActive)
+                .IsRequired();
+
+            entity.HasIndex(i => i.Code)
+                .IsUnique()
+                .HasDatabaseName("IX_ClubInvites_Code");
+
+            entity.HasIndex(i => i.ClubId)
+                .HasDatabaseName("IX_ClubInvites_ClubId");
         });
     }
 }

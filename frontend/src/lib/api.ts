@@ -260,6 +260,7 @@ export interface ClubDto {
   name: string
   description?: string
   role?: string
+  inviteCode?: string
 }
 
 export async function getMemberClubs(
@@ -354,9 +355,127 @@ export async function createClub(
     throw new CreateClubApiException({ code: 'unexpected', status: response.status })
   }
 
-  const data = payload as { id: string; name: string; description?: string; role: string }
+  const data = payload as { id: string; name: string; description?: string; role: string; inviteCode?: string }
   return {
     id: data.id,
+    name: data.name,
+    description: data.description,
+    role: data.role,
+    inviteCode: data.inviteCode,
+  }
+}
+
+export interface JoinClubRequest {
+  code: string
+}
+
+export type JoinClubApiError =
+  | { code: 'validation'; message?: string }
+  | { code: 'unauthorized' }
+  | { code: 'notFound'; message?: string }
+  | { code: 'alreadyMember'; message?: string }
+  | { code: 'expired'; message?: string }
+  | { code: 'rateLimited'; message?: string }
+  | { code: 'network' }
+  | { code: 'unexpected'; status: number }
+
+export class JoinClubApiException extends Error {
+  readonly apiError: JoinClubApiError
+
+  constructor(apiError: JoinClubApiError) {
+    super(JoinClubApiException.messageFor(apiError))
+    this.name = 'JoinClubApiException'
+    this.apiError = apiError
+  }
+
+  private static messageFor(apiError: JoinClubApiError): string {
+    if (apiError.code === 'validation') {
+      return apiError.message ?? 'validation_failed'
+    }
+    if (apiError.code === 'unauthorized') {
+      return 'unauthorized'
+    }
+    if (apiError.code === 'notFound') {
+      return apiError.message ?? 'not_found'
+    }
+    if (apiError.code === 'alreadyMember') {
+      return apiError.message ?? 'already_member'
+    }
+    if (apiError.code === 'expired') {
+      return apiError.message ?? 'expired'
+    }
+    if (apiError.code === 'rateLimited') {
+      return apiError.message ?? 'rate_limited'
+    }
+    if (apiError.code === 'network') {
+      return 'network'
+    }
+    return String(apiError.status)
+  }
+}
+
+export async function joinClub(
+  request: JoinClubRequest,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubDto> {
+  let response: Response
+  try {
+    response = await fetchFn('/api/clubs/join', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new JoinClubApiException({ code: 'network' })
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    payload = undefined
+  }
+
+  if (response.status === 401) {
+    throw new JoinClubApiException({ code: 'unauthorized' })
+  }
+
+  if (response.status === 400) {
+    const message = extractErrorString(payload)
+    throw new JoinClubApiException({ code: 'validation', message })
+  }
+
+  if (response.status === 404) {
+    const message = extractErrorString(payload)
+    throw new JoinClubApiException({ code: 'notFound', message })
+  }
+
+  if (response.status === 409) {
+    const message = extractErrorString(payload)
+    throw new JoinClubApiException({ code: 'alreadyMember', message })
+  }
+
+  if (response.status === 410) {
+    const message = extractErrorString(payload)
+    throw new JoinClubApiException({ code: 'expired', message })
+  }
+
+  if (response.status === 429) {
+    const message = extractErrorString(payload)
+    throw new JoinClubApiException({ code: 'rateLimited', message })
+  }
+
+  if (!response.ok) {
+    throw new JoinClubApiException({ code: 'unexpected', status: response.status })
+  }
+
+  const data = payload as { clubId?: string; id?: string; name: string; description?: string; role: string }
+  return {
+    id: data.clubId ?? data.id ?? '',
     name: data.name,
     description: data.description,
     role: data.role,

@@ -17,10 +17,17 @@ public sealed record CreateClubOutcome
     public string? Name { get; init; }
     public string? Description { get; init; }
     public string? Role { get; init; }
+    public string? InviteCode { get; init; }
     public DateTimeOffset? CreatedAtUtc { get; init; }
     public string? Violation { get; init; }
 
-    public static CreateClubOutcome Success(Guid clubId, string name, string? description, string role, DateTimeOffset createdAtUtc) =>
+    public static CreateClubOutcome Success(
+        Guid clubId,
+        string name,
+        string? description,
+        string role,
+        DateTimeOffset createdAtUtc,
+        string? inviteCode = null) =>
         new()
         {
             Status = CreateClubStatus.Success,
@@ -28,6 +35,7 @@ public sealed record CreateClubOutcome
             Name = name,
             Description = description,
             Role = role,
+            InviteCode = inviteCode,
             CreatedAtUtc = createdAtUtc
         };
 

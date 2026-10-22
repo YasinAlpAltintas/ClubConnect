@@ -19,4 +19,7 @@ public class Club
 
     /// <summary>Memberships linked to this club.</summary>
     public ICollection<Membership> Memberships { get; set; } = new List<Membership>();
+
+    /// <summary>Invite codes generated for this club.</summary>
+    public ICollection<ClubInvite> Invites { get; set; } = new List<ClubInvite>();
 }

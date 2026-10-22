@@ -56,7 +56,8 @@ public class AuthController(
         Guid Id,
         string Name,
         string Description,
-        string Role);
+        string Role,
+        string? InviteCode = null);
 
     /// <summary>
     /// Authenticates a club member.
@@ -161,7 +162,8 @@ public class AuthController(
             m.Id,
             m.Name,
             m.Description ?? string.Empty,
-            m.Role));
+            m.Role,
+            m.InviteCode));
 
         return Ok(response);
     }

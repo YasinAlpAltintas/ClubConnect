@@ -1,3 +1,4 @@
+using ClubConnect.Domain.Abstractions;
 using ClubConnect.Domain.Entities;
 using ClubConnect.Infrastructure.Persistence;
 using ClubConnect.Infrastructure.Repositories;
@@ -132,5 +133,102 @@ public class ClubRepositoryTests : IDisposable
         var repository = NewRepository();
         var found = await repository.GetByIdAsync(Guid.NewGuid(), CancellationToken.None);
         Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task CreateClubWithAdminAsync_GeneratesActive6DigitInviteCode()
+    {
+        var member = await SeedMemberAsync();
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Music Society", "Instruments", member.Id, CancellationToken.None);
+
+        var invite = await _context.ClubInvites.SingleOrDefaultAsync(i => i.ClubId == club.Id);
+        Assert.NotNull(invite);
+        Assert.True(invite!.IsActive);
+        Assert.Matches(@"^\d{6}$", invite.Code);
+
+        // Verify invite code is populated in summary for Admin
+        var clubs = await repository.GetClubsForMemberAsync(member.Id, CancellationToken.None);
+        var adminClub = clubs.Single(c => c.Id == club.Id);
+        Assert.Equal("Club Admin", adminClub.Role);
+        Assert.Equal(invite.Code, adminClub.InviteCode);
+    }
+
+    [Fact]
+    public async Task JoinClubByInviteCodeAsync_ValidCode_SuccessfullyJoinsAsClubMember()
+    {
+        var admin = await SeedMemberAsync("admin@example.com");
+        var joiner = await SeedMemberAsync("joiner@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Chess Club", "Grandmasters", admin.Id, CancellationToken.None);
+        var activeInvite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+
+        var result = await repository.JoinClubByInviteCodeAsync(activeInvite.Code, joiner.Id, CancellationToken.None);
+
+        Assert.Equal(JoinClubRepositoryStatus.Success, result.Status);
+        Assert.Equal(club.Id, result.ClubId);
+        Assert.Equal("Chess Club", result.Name);
+        Assert.Equal("Grandmasters", result.Description);
+        Assert.Equal("Club Member", result.Role);
+
+        // Verify membership created in DB
+        var membership = await _context.Memberships.SingleOrDefaultAsync(m => m.ClubId == club.Id && m.MemberId == joiner.Id);
+        Assert.NotNull(membership);
+        Assert.Equal("Club Member", membership!.Role);
+
+        // Verify joiner gets null invite code in club list (only Admins see invite code)
+        var joinerClubs = await repository.GetClubsForMemberAsync(joiner.Id, CancellationToken.None);
+        var joinedSummary = joinerClubs.Single(c => c.Id == club.Id);
+        Assert.Equal("Club Member", joinedSummary.Role);
+        Assert.Null(joinedSummary.InviteCode);
+    }
+
+    [Fact]
+    public async Task JoinClubByInviteCodeAsync_UnknownCode_ReturnsNotFound()
+    {
+        var joiner = await SeedMemberAsync("joiner-notfound@example.com");
+        var repository = NewRepository();
+
+        var result = await repository.JoinClubByInviteCodeAsync("999999", joiner.Id, CancellationToken.None);
+
+        Assert.Equal(JoinClubRepositoryStatus.NotFound, result.Status);
+        Assert.Contains("Invalid or unknown invite code", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task JoinClubByInviteCodeAsync_ExpiredCode_ReturnsExpired()
+    {
+        var admin = await SeedMemberAsync("admin-expired@example.com");
+        var joiner = await SeedMemberAsync("joiner-expired@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Expired Club", null, admin.Id, CancellationToken.None);
+        var invite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+        invite.ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+        await _context.SaveChangesAsync();
+
+        var result = await repository.JoinClubByInviteCodeAsync(invite.Code, joiner.Id, CancellationToken.None);
+
+        Assert.Equal(JoinClubRepositoryStatus.Expired, result.Status);
+        Assert.Contains("expired", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task JoinClubByInviteCodeAsync_AlreadyMember_ReturnsAlreadyMember()
+    {
+        var admin = await SeedMemberAsync("admin-already@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Already Club", null, admin.Id, CancellationToken.None);
+        var invite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+
+        // Admin tries to join their own club using the invite code
+        var result = await repository.JoinClubByInviteCodeAsync(invite.Code, admin.Id, CancellationToken.None);
+
+        Assert.Equal(JoinClubRepositoryStatus.AlreadyMember, result.Status);
+        Assert.Equal(club.Id, result.ClubId);
+        Assert.Contains("already a member", result.ErrorMessage);
     }
 }
