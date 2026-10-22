@@ -83,15 +83,12 @@ export function useActiveClub({
     return clubs[0]?.id ?? null
   }, [clubs, selectedId, memberId])
 
-  // Sync back to state and localStorage when selection changes
+  // Sync active club ID to localStorage when resolved
   useEffect(() => {
-    if (activeClubId !== selectedId) {
-      setSelectedId(activeClubId)
-    }
     if (memberId) {
       setStoredActiveClubId(memberId, activeClubId)
     }
-  }, [activeClubId, selectedId, memberId])
+  }, [activeClubId, memberId])
 
   const activeClub = useMemo(() => {
     if (!activeClubId || !clubs) return null

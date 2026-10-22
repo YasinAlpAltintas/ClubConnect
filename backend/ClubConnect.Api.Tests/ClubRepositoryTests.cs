@@ -231,4 +231,70 @@ public class ClubRepositoryTests : IDisposable
         Assert.Equal(club.Id, result.ClubId);
         Assert.Contains("already a member", result.ErrorMessage);
     }
+
+    [Fact]
+    public async Task GetClubForMemberAsync_NonExistentClub_ReturnsNull()
+    {
+        var member = await SeedMemberAsync("member-notfound@example.com");
+        var repository = NewRepository();
+
+        var result = await repository.GetClubForMemberAsync(Guid.NewGuid(), member.Id, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetClubForMemberAsync_UserNotMember_ReturnsNull_EnforcesTenantIsolation()
+    {
+        var admin = await SeedMemberAsync("admin-tenant@example.com");
+        var stranger = await SeedMemberAsync("stranger-tenant@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Tenant Protected Club", "Secret", admin.Id, CancellationToken.None);
+
+        // Stranger attempts to access club
+        var result = await repository.GetClubForMemberAsync(club.Id, stranger.Id, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetClubForMemberAsync_UserIsAdmin_ReturnsClubWithInviteCode()
+    {
+        var admin = await SeedMemberAsync("admin-detail@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Admin Detail Club", "Description", admin.Id, CancellationToken.None);
+
+        var result = await repository.GetClubForMemberAsync(club.Id, admin.Id, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(club.Id, result!.Id);
+        Assert.Equal("Admin Detail Club", result.Name);
+        Assert.Equal("Description", result.Description);
+        Assert.Equal("Club Admin", result.Role);
+        Assert.NotNull(result.InviteCode);
+        Assert.Matches(@"^\d{6}$", result.InviteCode);
+    }
+
+    [Fact]
+    public async Task GetClubForMemberAsync_UserIsMember_ReturnsClubWithNullInviteCode()
+    {
+        var admin = await SeedMemberAsync("admin-memdetail@example.com");
+        var joiner = await SeedMemberAsync("joiner-memdetail@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Member Detail Club", "Description", admin.Id, CancellationToken.None);
+        var invite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+
+        await repository.JoinClubByInviteCodeAsync(invite.Code, joiner.Id, CancellationToken.None);
+
+        var result = await repository.GetClubForMemberAsync(club.Id, joiner.Id, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(club.Id, result!.Id);
+        Assert.Equal("Member Detail Club", result.Name);
+        Assert.Equal("Club Member", result.Role);
+        Assert.Null(result.InviteCode); // Non-admins must not see invite code
+    }
 }

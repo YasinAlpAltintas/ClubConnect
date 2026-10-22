@@ -104,7 +104,7 @@ export default function LobbyPage({
     try {
       const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
-      setActiveClubId(joined.clubId)
+      setActiveClubId(joined.id)
       setCodeSubmitted(true)
       setEmptySuccessMessage(t('lobby.empty.codeSuccess', { name: joined.name }))
       setInviteCode('')
@@ -216,7 +216,7 @@ export default function LobbyPage({
     try {
       const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
-      setActiveClubId(joined.clubId)
+      setActiveClubId(joined.id)
       closeModal()
     } catch (err: unknown) {
       if (err instanceof JoinClubApiException) {
