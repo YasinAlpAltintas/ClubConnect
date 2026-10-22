@@ -166,7 +166,7 @@ jobs:
 
           # 2. Retrieve all check-runs across pages (fail-closed, no API error suppression)
           echo "Retrieving all check-runs for commit $COMMIT_SHA with pagination..."
-          all_check_runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${COMMIT_SHA}/check-runs" | jq -s '[.[].check_runs[]?]')
+          all_check_runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${latest_run_id}/jobs?per_page=100" | jq -s '[.[].jobs[]?]')
           total_checks=$(jq 'length' <<< "$all_check_runs")
 
           if [ "$total_checks" -eq 0 ]; then
