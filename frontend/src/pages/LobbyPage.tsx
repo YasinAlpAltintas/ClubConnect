@@ -12,6 +12,8 @@ import {
 } from '../lib/api'
 import { createClubSchema } from '../schemas/club'
 import { inviteCodeSchema } from '../schemas/invite'
+import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
+import { useActiveClub } from '../lib/useActiveClub'
 
 export interface AuthenticatedMember {
   memberId: string
@@ -66,6 +68,11 @@ export default function LobbyPage({
     enabled: initialClubs === undefined && Boolean(member.token),
   })
 
+  const { activeClubId, activeClub, setActiveClubId } = useActiveClub({
+    clubs,
+    memberId: member.memberId,
+  })
+
   function toggleLanguage() {
     const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
     void i18n.changeLanguage(next)
@@ -97,6 +104,7 @@ export default function LobbyPage({
     try {
       const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+      setActiveClubId(joined.clubId)
       setCodeSubmitted(true)
       setEmptySuccessMessage(t('lobby.empty.codeSuccess', { name: joined.name }))
       setInviteCode('')
@@ -157,7 +165,7 @@ export default function LobbyPage({
     setIsCreating(true)
 
     try {
-      await createClub(
+      const created = await createClub(
         {
           name: parsed.data.name,
           description: parsed.data.description,
@@ -166,6 +174,7 @@ export default function LobbyPage({
       )
 
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+      setActiveClubId(created.id)
 
       setModalType(null)
       setClubName('')
@@ -205,8 +214,9 @@ export default function LobbyPage({
     setIsJoiningModal(true)
 
     try {
-      await joinClub({ code: parsed.data.code }, member.token)
+      const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+      setActiveClubId(joined.clubId)
       closeModal()
     } catch (err: unknown) {
       if (err instanceof JoinClubApiException) {
@@ -236,13 +246,18 @@ export default function LobbyPage({
   return (
     <main className="flex min-h-screen flex-col bg-slate-50">
       <header className="flex items-center justify-between border-b border-slate-200/80 bg-white px-6 py-4 shadow-xs">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <span className="text-xl font-bold tracking-tight text-indigo-600">
             {t('app.name')}
           </span>
-          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+          <span className="hidden sm:inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
             Student Portal
           </span>
+          <ClubSwitcherDropdown
+            clubs={clubs}
+            activeClubId={activeClubId}
+            onSelectClub={setActiveClubId}
+          />
         </div>
         <div className="flex items-center space-x-3">
           <button
@@ -307,6 +322,65 @@ export default function LobbyPage({
             </div>
           </div>
         </section>
+
+        {/* Active Club Workspace Banner */}
+        {activeClub && clubs.length > 0 && (
+          <section
+            data-testid="active-club-workspace"
+            aria-label="Active Club Workspace"
+            className="mb-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xs ring-1 ring-slate-800 sm:p-8"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+                  <span>{t('lobby.activeWorkspaceTitle')}</span>
+                </div>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                  {activeClub.name}
+                </h2>
+                {activeClub.description ? (
+                  <p className="mt-2 text-sm text-slate-300 max-w-2xl leading-relaxed">
+                    {activeClub.description}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm italic text-slate-400">
+                    {t('lobby.activeWorkspaceSubtitle')}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {activeClub.role && (
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${
+                      activeClub.role === 'Club Admin'
+                        ? 'bg-amber-400/20 text-amber-300 ring-amber-400/30'
+                        : 'bg-indigo-400/20 text-indigo-300 ring-indigo-400/30'
+                    }`}
+                  >
+                    {activeClub.role}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {activeClub.role === 'Club Admin' && activeClub.inviteCode && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white/10 p-3 text-xs backdrop-blur-xs ring-1 ring-white/15">
+                <span className="font-medium text-slate-200">
+                  {t('lobby.inviteCodeBadge', { code: activeClub.inviteCode })}
+                </span>
+                <button
+                  type="button"
+                  data-testid="active-workspace-copy-code"
+                  onClick={() => handleCopyInviteCode(activeClub.id, activeClub.inviteCode!)}
+                  className="rounded-lg bg-white/20 px-3 py-1.5 font-semibold text-white hover:bg-white/30 cursor-pointer transition-colors"
+                >
+                  {copiedClubId === activeClub.id ? t('lobby.inviteCodeCopied') : t('lobby.copyInviteCode')}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* My Clubs Section */}
         <section className="space-y-6" aria-label="My Clubs">
@@ -518,44 +592,72 @@ export default function LobbyPage({
           ) : (
             /* Active Clubs Grid */
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {clubs.map((club) => (
-                <article
-                  key={club.id}
-                  className="rounded-2xl bg-white p-6 shadow-xs ring-1 ring-slate-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">{club.name}</h3>
-                    {club.role && (
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                        club.role === 'Club Admin'
-                          ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                          : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
-                      }`}>
-                        {club.role}
-                      </span>
-                    )}
-                  </div>
-                  {club.description && (
-                    <p className="mt-2 text-sm text-slate-600 line-clamp-2">
-                      {club.description}
-                    </p>
-                  )}
-                  {club.role === 'Club Admin' && club.inviteCode && (
-                    <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs ring-1 ring-slate-200/80">
-                      <span className="font-medium text-slate-600">
-                        {t('lobby.inviteCodeBadge', { code: club.inviteCode })}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyInviteCode(club.id, club.inviteCode!)}
-                        className="rounded-md bg-white px-2 py-1 font-semibold text-indigo-600 ring-1 ring-slate-200 hover:bg-indigo-50 cursor-pointer"
-                      >
-                        {copiedClubId === club.id ? t('lobby.inviteCodeCopied') : t('lobby.copyInviteCode')}
-                      </button>
+              {clubs.map((club) => {
+                const isActive = club.id === activeClubId
+                return (
+                  <article
+                    key={club.id}
+                    data-testid={`club-card-${club.id}`}
+                    aria-current={isActive ? 'true' : undefined}
+                    className={`rounded-2xl bg-white p-6 shadow-xs transition-all ${
+                      isActive
+                        ? 'ring-2 ring-indigo-600 shadow-sm'
+                        : 'ring-1 ring-slate-200 hover:ring-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 truncate pr-2">
+                        <h3 className="font-semibold text-slate-900 truncate">{club.name}</h3>
+                        {isActive && (
+                          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+                            {t('lobby.currentlyActive')}
+                          </span>
+                        )}
+                      </div>
+                      {club.role && (
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                            club.role === 'Club Admin'
+                              ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                              : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+                          }`}
+                        >
+                          {club.role}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </article>
-              ))}
+                    {club.description && (
+                      <p className="mt-2 text-sm text-slate-600 line-clamp-2">
+                        {club.description}
+                      </p>
+                    )}
+                    <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100">
+                      {!isActive ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveClubId(club.id)}
+                          className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        >
+                          {t('lobby.switchToClub')} →
+                        </button>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400">
+                          {t('lobby.activeWorkspaceTitle')}
+                        </span>
+                      )}
+                      {club.role === 'Club Admin' && club.inviteCode && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyInviteCode(club.id, club.inviteCode!)}
+                          className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 cursor-pointer"
+                        >
+                          {copiedClubId === club.id ? t('lobby.inviteCodeCopied') : t('lobby.copyInviteCode')}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           )}
         </section>

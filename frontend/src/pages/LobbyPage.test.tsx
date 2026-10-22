@@ -318,11 +318,11 @@ describe('LobbyPage', () => {
 
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: dummyClubs })
 
-    expect(screen.getByText('Robotics Association')).toBeInTheDocument()
-    expect(screen.getByText('Debate Society')).toBeInTheDocument()
-    expect(screen.getByText('Club Admin')).toBeInTheDocument()
-    expect(screen.getByText('Club Member')).toBeInTheDocument()
-    expect(screen.getByText('Invite Code: 048291')).toBeInTheDocument()
+    expect(screen.getAllByText('Robotics Association')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Debate Society')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Club Admin')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Club Member')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Invite Code: 048291')[0]).toBeInTheDocument()
 
     // Header buttons
     const joinButton = screen.getByRole('button', { name: 'Join Club' })
@@ -363,12 +363,79 @@ describe('LobbyPage', () => {
 
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: dummyClubs })
 
-    const copyBtn = screen.getByRole('button', { name: 'Copy code' })
+    const copyBtn = screen.getAllByRole('button', { name: 'Copy code' })[0]
     await user.click(copyBtn)
 
     expect(writeTextMock).toHaveBeenCalledWith('048291')
     await waitFor(() => {
-      expect(screen.getByText('Copied!')).toBeInTheDocument()
+      expect(screen.getAllByText('Copied!')[0]).toBeInTheDocument()
     })
+  })
+
+  it('switches active club using the top navigation dropdown and updates active workspace', async () => {
+    const user = userEvent.setup()
+    const multiClubs = [
+      {
+        id: 'club-alpha',
+        name: 'Club Alpha',
+        description: 'First club description',
+        role: 'Club Admin',
+      },
+      {
+        id: 'club-beta',
+        name: 'Club Beta',
+        description: 'Second club description',
+        role: 'Club Member',
+      },
+    ]
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: multiClubs })
+
+    // Initially Club Alpha is active
+    const workspace = screen.getByTestId('active-club-workspace')
+    expect(within(workspace).getByText('Club Alpha')).toBeInTheDocument()
+    expect(within(workspace).getByText('First club description')).toBeInTheDocument()
+    expect(within(workspace).getByText('Club Admin')).toBeInTheDocument()
+
+    // Open dropdown in top nav
+    const dropdownBtn = screen.getByRole('button', { name: /Switch club/i })
+    await user.click(dropdownBtn)
+
+    // Select Club Beta
+    const optionBeta = screen.getByRole('option', { name: /Club Beta/i })
+    await user.click(optionBeta)
+
+    // Workspace banner updates to Club Beta
+    expect(within(workspace).getByText('Club Beta')).toBeInTheDocument()
+    expect(within(workspace).getByText('Second club description')).toBeInTheDocument()
+    expect(within(workspace).getByText('Club Member')).toBeInTheDocument()
+  })
+
+  it('switches active club when clicking switch to workspace button in club card', async () => {
+    const user = userEvent.setup()
+    const multiClubs = [
+      {
+        id: 'club-1',
+        name: 'Club 1',
+        description: 'Desc 1',
+        role: 'Club Admin',
+      },
+      {
+        id: 'club-2',
+        name: 'Club 2',
+        description: 'Desc 2',
+        role: 'Club Member',
+      },
+    ]
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: multiClubs })
+
+    // Card 2 has "Switch to workspace →" button
+    const switchBtn = screen.getByRole('button', { name: /Switch to workspace/i })
+    await user.click(switchBtn)
+
+    // Now Club 2 is active
+    const workspace = screen.getByTestId('active-club-workspace')
+    expect(within(workspace).getByText('Club 2')).toBeInTheDocument()
   })
 })
