@@ -50,7 +50,7 @@ test.describe('INC-10: Empty Lobby with Clear Calls-to-Action', () => {
     await expect(emptyState.getByRole('button', { name: /Explore Clubs|Ontdek clubs/ })).toBeVisible()
     await expect(emptyState.getByRole('button', { name: /Create New Club|Register a Club|Club oprichten/i })).toBeVisible()
     await expect(emptyState.getByRole('button', { name: /Join Club|Deelnemen/ })).toBeVisible()
-    await expect(emptyState.getByPlaceholder(/CLUB-2026/)).toBeVisible()
+    await expect(emptyState.getByPlaceholder(/048291|CLUB-2026/)).toBeVisible()
 
     // Confirm 3 guided steps
     await expect(emptyState.getByText(/Discover Communities|Ontdek verenigingen/)).toBeVisible()
@@ -93,31 +93,47 @@ test.describe('INC-10: Empty Lobby with Clear Calls-to-Action', () => {
   })
 
   test('submits invite code with validation in empty lobby', async ({ page, request }) => {
-    const email = `inc10-code-${Date.now()}@example.com`
+    const creatorEmail = `inc10-creator-${Date.now()}@example.com`
+    const joinerEmail = `inc10-code-${Date.now()}@example.com`
     const password = 'Passw0rd123!'
 
-    await request.post('/api/auth/register', { data: { email, password } })
+    // 1. Create a club with an admin to generate a real 6-digit invite code
+    await request.post('/api/auth/register', { data: { email: creatorEmail, password } })
+    const loginRes = await request.post('/api/auth/login', { data: { email: creatorEmail, password } })
+    const { token } = await loginRes.json()
+    const clubRes = await request.post('/api/clubs', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { name: 'Campus Robotics 2026' },
+    })
+    const { inviteCode } = await clubRes.json()
+
+    // 2. Register joiner account
+    await request.post('/api/auth/register', { data: { email: joinerEmail, password } })
 
     await page.goto('/')
     await page.getByRole('button', { name: /Log in|Inloggen/ }).click()
-    await page.fill('#email', email)
+    await page.fill('#email', joinerEmail)
     await page.fill('#password', password)
     await page.click('button[type="submit"]')
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Club Lobby/)
 
-    // 1. Submit empty code -> error alert
+    // 3. Submit empty code -> error alert
     await page.getByRole('button', { name: /Join Club|Deelnemen/ }).click()
     const alert = page.locator('[role="alert"]')
     await expect(alert).toBeVisible()
 
-    // 2. Type valid code -> success notice
-    await page.fill('#invite-code', 'CAMPUS-ROBOTICS-2026')
+    // 4. Type non-existent 6-digit code -> shows not found error
+    await page.fill('#invite-code', '999999')
+    await page.getByRole('button', { name: /Join Club|Deelnemen/ }).click()
+    await expect(page.locator('[role="alert"]')).toContainText(/Invalid or unknown invite code|Ongeldige of onbekende uitnodigingscode/i)
+
+    // 5. Type valid 6-digit code -> joins club and transitions to active clubs grid
+    await page.fill('#invite-code', inviteCode)
     await page.getByRole('button', { name: /Join Club|Deelnemen/ }).click()
 
-    const status = page.locator('[role="status"]')
-    await expect(status).toBeVisible()
-    await expect(status).toContainText(/Invite code validated|Uitnodigingscode gevalideerd/i)
+    await expect(page.getByTestId('lobby-empty-state')).not.toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Campus Robotics 2026' })).toBeVisible()
   })
 
   test('switches language dynamically in empty lobby state', async ({ page, request }) => {
