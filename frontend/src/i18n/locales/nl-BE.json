@@ -7,6 +7,16 @@
     "language": "Taal",
     "languageToggle": "English"
   },
+  "clubSwitcher": {
+    "label": "Wissel van club",
+    "activeWorkspace": "Actieve werkruimte",
+    "currentClub": "Huidige club",
+    "switchClub": "Wissel van club",
+    "selectClub": "Selecteer een club",
+    "allClubs": "Alle clubs (Lobby)",
+    "roleAdmin": "Clubbeheerder",
+    "roleMember": "Clublid"
+  },
   "nav": {
     "toLogin": "Heb je al een account? Log in",
     "toRegister": "Nog geen account? Registreer"

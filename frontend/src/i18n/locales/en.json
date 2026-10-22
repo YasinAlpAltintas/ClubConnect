@@ -7,6 +7,16 @@
     "language": "Language",
     "languageToggle": "Nederlands"
   },
+  "clubSwitcher": {
+    "label": "Switch club",
+    "activeWorkspace": "Active Workspace",
+    "currentClub": "Current Club",
+    "switchClub": "Switch club",
+    "selectClub": "Select a club",
+    "allClubs": "All Clubs (Lobby)",
+    "roleAdmin": "Club Admin",
+    "roleMember": "Club Member"
+  },
   "nav": {
     "toLogin": "Already have an account? Log in",
     "toRegister": "Don't have an account yet? Register"
