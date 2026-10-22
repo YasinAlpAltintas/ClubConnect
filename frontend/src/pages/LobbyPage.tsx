@@ -6,9 +6,12 @@ import {
   getMemberClubs,
   createClub,
   CreateClubApiException,
+  joinClub,
+  JoinClubApiException,
   type ClubDto,
 } from '../lib/api'
 import { createClubSchema } from '../schemas/club'
+import { inviteCodeSchema } from '../schemas/invite'
 
 export interface AuthenticatedMember {
   memberId: string
@@ -24,7 +27,7 @@ export interface LobbyPageProps {
   initialClubs?: ClubDto[]
 }
 
-type ModalType = 'explore' | 'create' | null
+type ModalType = 'explore' | 'create' | 'join' | null
 
 export default function LobbyPage({
   member,
@@ -39,6 +42,8 @@ export default function LobbyPage({
   const [inviteCode, setInviteCode] = useState('')
   const [codeSubmitted, setCodeSubmitted] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [isJoiningEmpty, setIsJoiningEmpty] = useState(false)
+  const [emptySuccessMessage, setEmptySuccessMessage] = useState<string | null>(null)
 
   // Create club form state
   const [clubName, setClubName] = useState('')
@@ -46,6 +51,13 @@ export default function LobbyPage({
   const [nameError, setNameError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+
+  // Join club modal state
+  const [modalInviteCode, setModalInviteCode] = useState('')
+  const [modalCodeError, setModalCodeError] = useState<string | null>(null)
+  const [modalFormError, setModalFormError] = useState<string | null>(null)
+  const [isJoiningModal, setIsJoiningModal] = useState(false)
+  const [copiedClubId, setCopiedClubId] = useState<string | null>(null)
 
   const { data: clubs = initialClubs ?? [], isLoading } = useQuery<ClubDto[]>({
     queryKey: ['memberClubs', member.token],
@@ -59,24 +71,70 @@ export default function LobbyPage({
     void i18n.changeLanguage(next)
   }
 
-  function handleInviteSubmit(e: React.FormEvent) {
+  function handleCopyInviteCode(clubId: string, code: string) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(code)
+      setCopiedClubId(clubId)
+      setTimeout(() => setCopiedClubId(null), 2000)
+    }
+  }
+
+  async function handleEmptyInviteSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!inviteCode.trim()) {
-      setCodeError(t('lobby.empty.codeError'))
-      setCodeSubmitted(false)
+    setCodeError(null)
+    setCodeSubmitted(false)
+    setEmptySuccessMessage(null)
+
+    const parsed = inviteCodeSchema.safeParse({ code: inviteCode })
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      const errorKey = issue?.message ?? 'required'
+      setCodeError(t(`lobby.joinModal.errors.${errorKey}`, { defaultValue: t('lobby.empty.codeError') }))
       return
     }
-    setCodeError(null)
-    setCodeSubmitted(true)
+
+    setIsJoiningEmpty(true)
+    try {
+      const joined = await joinClub({ code: parsed.data.code }, member.token)
+      await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+      setCodeSubmitted(true)
+      setEmptySuccessMessage(t('lobby.empty.codeSuccess', { name: joined.name }))
+      setInviteCode('')
+    } catch (err: unknown) {
+      if (err instanceof JoinClubApiException) {
+        if (err.apiError.code === 'validation') {
+          setCodeError(t('lobby.joinModal.errors.exact_six_digits'))
+        } else if (err.apiError.code === 'unauthorized') {
+          onSessionExpired?.()
+        } else if (err.apiError.code === 'notFound') {
+          setCodeError(t('lobby.joinModal.errors.not_found'))
+        } else if (err.apiError.code === 'alreadyMember') {
+          setCodeError(t('lobby.joinModal.errors.already_member'))
+        } else if (err.apiError.code === 'expired') {
+          setCodeError(t('lobby.joinModal.errors.expired'))
+        } else if (err.apiError.code === 'rateLimited') {
+          setCodeError(t('lobby.joinModal.errors.rate_limited'))
+        } else {
+          setCodeError(t('lobby.joinModal.errors.generic'))
+        }
+      } else {
+        setCodeError(t('lobby.joinModal.errors.generic'))
+      }
+    } finally {
+      setIsJoiningEmpty(false)
+    }
   }
 
   function closeModal() {
-    if (isCreating) return
+    if (isCreating || isJoiningModal) return
     setModalType(null)
     setClubName('')
     setClubDescription('')
     setNameError(null)
     setFormError(null)
+    setModalInviteCode('')
+    setModalCodeError(null)
+    setModalFormError(null)
   }
 
   async function handleCreateClubSubmit(e: React.FormEvent) {
@@ -128,6 +186,50 @@ export default function LobbyPage({
       }
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  async function handleModalJoinSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setModalCodeError(null)
+    setModalFormError(null)
+
+    const parsed = inviteCodeSchema.safeParse({ code: modalInviteCode })
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0]
+      const errorKey = issue?.message ?? 'required'
+      setModalCodeError(t(`lobby.joinModal.errors.${errorKey}`, { defaultValue: t('lobby.joinModal.errors.exact_six_digits') }))
+      return
+    }
+
+    setIsJoiningModal(true)
+
+    try {
+      await joinClub({ code: parsed.data.code }, member.token)
+      await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
+      closeModal()
+    } catch (err: unknown) {
+      if (err instanceof JoinClubApiException) {
+        if (err.apiError.code === 'validation') {
+          setModalCodeError(t('lobby.joinModal.errors.exact_six_digits'))
+        } else if (err.apiError.code === 'unauthorized') {
+          onSessionExpired?.()
+        } else if (err.apiError.code === 'notFound') {
+          setModalFormError(t('lobby.joinModal.errors.not_found'))
+        } else if (err.apiError.code === 'alreadyMember') {
+          setModalFormError(t('lobby.joinModal.errors.already_member'))
+        } else if (err.apiError.code === 'expired') {
+          setModalFormError(t('lobby.joinModal.errors.expired'))
+        } else if (err.apiError.code === 'rateLimited') {
+          setModalFormError(t('lobby.joinModal.errors.rate_limited'))
+        } else {
+          setModalFormError(t('lobby.joinModal.errors.generic'))
+        }
+      } else {
+        setModalFormError(t('lobby.joinModal.errors.generic'))
+      }
+    } finally {
+      setIsJoiningModal(false)
     }
   }
 
@@ -217,16 +319,28 @@ export default function LobbyPage({
                 {clubs.length} {clubs.length === 1 ? 'club' : 'clubs'}
               </span>
               {clubs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setModalType('create')}
-                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer"
-                >
-                  <svg className="mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
-                  {t('lobby.createNewClub')}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('join')}
+                    className="inline-flex items-center justify-center rounded-xl bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <svg className="mr-1.5 h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    {t('lobby.joinClub')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalType('create')}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer"
+                  >
+                    <svg className="mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    {t('lobby.createNewClub')}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -304,24 +418,41 @@ export default function LobbyPage({
                   <h4 className="text-sm font-semibold text-slate-800">
                     {t('lobby.empty.codeCta')}
                   </h4>
-                  <form onSubmit={handleInviteSubmit} className="mt-3 flex flex-col items-center justify-center gap-2 sm:flex-row">
+                  <form onSubmit={handleEmptyInviteSubmit} className="mt-3 flex flex-col items-center justify-center gap-2 sm:flex-row">
                     <input
                       type="text"
                       id="invite-code"
                       value={inviteCode}
+                      maxLength={6}
+                      disabled={isJoiningEmpty}
                       onChange={(e) => {
-                        setInviteCode(e.target.value)
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
+                        setInviteCode(digits)
+                        if (codeError) setCodeError(null)
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault()
+                        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                        setInviteCode(pasted)
                         if (codeError) setCodeError(null)
                       }}
                       placeholder={t('lobby.empty.codePlaceholder')}
                       aria-label={t('lobby.empty.codeCta')}
-                      className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-center text-sm font-mono tracking-widest text-slate-900 placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100 disabled:text-slate-500"
                     />
                     <button
                       type="submit"
-                      className="w-full sm:w-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 cursor-pointer"
+                      disabled={isJoiningEmpty}
+                      className="inline-flex w-full sm:w-auto items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 cursor-pointer"
                     >
-                      {t('lobby.empty.codeSubmit')}
+                      {isJoiningEmpty ? (
+                        <>
+                          <div className="mr-2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                          {t('lobby.joinModal.submitting')}
+                        </>
+                      ) : (
+                        t('lobby.empty.codeSubmit')
+                      )}
                     </button>
                   </form>
 
@@ -331,9 +462,9 @@ export default function LobbyPage({
                     </p>
                   )}
 
-                  {codeSubmitted && (
+                  {codeSubmitted && emptySuccessMessage && (
                     <div role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
-                      {t('lobby.empty.codeSuccess')}
+                      {emptySuccessMessage}
                     </div>
                   )}
                 </div>
@@ -395,7 +526,11 @@ export default function LobbyPage({
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-slate-900">{club.name}</h3>
                     {club.role && (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                        club.role === 'Club Admin'
+                          ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                          : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+                      }`}>
                         {club.role}
                       </span>
                     )}
@@ -404,6 +539,20 @@ export default function LobbyPage({
                     <p className="mt-2 text-sm text-slate-600 line-clamp-2">
                       {club.description}
                     </p>
+                  )}
+                  {club.role === 'Club Admin' && club.inviteCode && (
+                    <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs ring-1 ring-slate-200/80">
+                      <span className="font-medium text-slate-600">
+                        {t('lobby.inviteCodeBadge', { code: club.inviteCode })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyInviteCode(club.id, club.inviteCode!)}
+                        className="rounded-md bg-white px-2 py-1 font-semibold text-indigo-600 ring-1 ring-slate-200 hover:bg-indigo-50 cursor-pointer"
+                      >
+                        {copiedClubId === club.id ? t('lobby.inviteCodeCopied') : t('lobby.copyInviteCode')}
+                      </button>
+                    </div>
                   )}
                 </article>
               ))}
@@ -538,6 +687,106 @@ export default function LobbyPage({
                     </>
                   ) : (
                     t('lobby.createModal.submit')
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Join Club Modal */}
+      {modalType === 'join' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="join-club-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200 sm:p-8">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 id="join-club-title" className="text-xl font-bold tracking-tight text-slate-900">
+                  {t('lobby.joinModal.title')}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {t('lobby.joinModal.subtitle')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isJoiningModal}
+                aria-label="Close"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 cursor-pointer"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleModalJoinSubmit} className="mt-6 space-y-4">
+              {modalFormError && (
+                <div role="alert" className="rounded-xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200">
+                  {modalFormError}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="modal-invite-code" className="block text-sm font-medium text-slate-700">
+                  {t('lobby.joinModal.codeLabel')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="modal-invite-code"
+                  value={modalInviteCode}
+                  maxLength={6}
+                  disabled={isJoiningModal}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
+                    setModalInviteCode(digits)
+                    if (modalCodeError) setModalCodeError(null)
+                  }}
+                  onPaste={(e) => {
+                    e.preventDefault()
+                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                    setModalInviteCode(pasted)
+                    if (modalCodeError) setModalCodeError(null)
+                  }}
+                  placeholder={t('lobby.joinModal.codePlaceholder')}
+                  aria-invalid={Boolean(modalCodeError)}
+                  aria-describedby={modalCodeError ? 'modal-code-error' : undefined}
+                  className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-center text-lg font-mono tracking-widest text-slate-900 placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:bg-slate-100 disabled:text-slate-500"
+                />
+                {modalCodeError && (
+                  <p id="modal-code-error" role="alert" className="mt-1.5 text-xs font-medium text-red-600">
+                    {modalCodeError}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isJoiningModal}
+                  className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
+                >
+                  {t('lobby.joinModal.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isJoiningModal}
+                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60 cursor-pointer"
+                >
+                  {isJoiningModal ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                      {t('lobby.joinModal.submitting')}
+                    </>
+                  ) : (
+                    t('lobby.joinModal.submit')
                   )}
                 </button>
               </div>

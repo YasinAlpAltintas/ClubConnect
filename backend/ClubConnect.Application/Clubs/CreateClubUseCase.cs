@@ -52,12 +52,15 @@ public sealed class CreateClubUseCase(IClubRepository clubRepository)
                 command.AdminMemberId,
                 cancellationToken).ConfigureAwait(false);
 
+            var initialInviteCode = club.Invites.FirstOrDefault()?.Code;
+
             return CreateClubOutcome.Success(
                 club.Id,
                 club.Name,
                 club.Description,
                 "Club Admin",
-                club.CreatedAtUtc);
+                club.CreatedAtUtc,
+                initialInviteCode);
         }
         catch (Exception ex)
         {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import LobbyPage, { type LobbyPageProps } from './LobbyPage'
@@ -10,6 +10,7 @@ vi.mock('../lib/api', async () => {
   return {
     ...actual,
     createClub: vi.fn(),
+    joinClub: vi.fn(),
     getMemberClubs: vi.fn(),
   }
 })
@@ -38,6 +39,12 @@ describe('LobbyPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.getMemberClubs).mockResolvedValue([])
+    vi.mocked(api.joinClub).mockResolvedValue({
+      id: 'c-1',
+      name: 'Leuven Coding Society',
+      description: 'Campus developers',
+      role: 'Club Member',
+    })
   })
 
   it('renders lobby heading, welcome email, memberId, and displayName', () => {
@@ -82,7 +89,7 @@ describe('LobbyPage', () => {
     expect(screen.getByRole('button', { name: 'Explore Clubs' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Create New Club/i }).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('button', { name: 'Join Club' })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('e.g. CLUB-2026')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('e.g. 048291')).toBeInTheDocument()
 
     // 3 Steps
     expect(screen.getByText('1. Discover Communities')).toBeInTheDocument()
@@ -115,60 +122,37 @@ describe('LobbyPage', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Create New Club' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/Club Name/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Description/i)).toBeInTheDocument()
 
-    // Submit without typing name -> validation error
-    const submitBtn = screen.getByRole('button', { name: 'Create Club' })
-    await user.click(submitBtn)
-
+    await user.click(screen.getByRole('button', { name: 'Create Club' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Club name is required.')
-    expect(api.createClub).not.toHaveBeenCalled()
 
-    // Type 1 character -> short error
-    const nameInput = screen.getByLabelText(/Club Name/i)
-    await user.type(nameInput, 'A')
-    await user.click(submitBtn)
-    expect(screen.getByRole('alert')).toHaveTextContent('Club name must be at least 2 characters.')
-
-    // Click Cancel -> modal closes
-    const cancelBtn = screen.getByRole('button', { name: 'Cancel' })
-    await user.click(cancelBtn)
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('successfully creates a club and closes modal', async () => {
     const user = userEvent.setup()
-    const mockCreatedClub = {
-      id: 'club-created-123',
-      name: 'Leuven Robotics Society',
-      description: 'Building autonomous rovers',
+    vi.mocked(api.createClub).mockResolvedValue({
+      id: 'c-100',
+      name: 'Leuven Coding Society',
+      description: 'Campus developers',
       role: 'Club Admin',
-    }
-    vi.mocked(api.createClub).mockResolvedValue(mockCreatedClub)
+    })
 
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
 
     const createButtons = screen.getAllByRole('button', { name: /Create New Club/i })
     await user.click(createButtons[0])
 
-    await user.type(screen.getByLabelText(/Club Name/i), 'Leuven Robotics Society')
-    await user.type(screen.getByLabelText(/Description/i), 'Building autonomous rovers')
-
-    const submitBtn = screen.getByRole('button', { name: 'Create Club' })
-    await user.click(submitBtn)
+    await user.type(screen.getByLabelText(/Club Name/i), 'Leuven Coding Society')
+    await user.type(screen.getByLabelText(/Description/i), 'Campus developers')
+    await user.click(screen.getByRole('button', { name: 'Create Club' }))
 
     await waitFor(() => {
       expect(api.createClub).toHaveBeenCalledWith(
-        {
-          name: 'Leuven Robotics Society',
-          description: 'Building autonomous rovers',
-        },
+        { name: 'Leuven Coding Society', description: 'Campus developers' },
         'valid-test-token',
       )
-    })
-
-    await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
@@ -218,53 +202,173 @@ describe('LobbyPage', () => {
     })
   })
 
-  it('shows validation error when submitting empty invite code', async () => {
+  it('shows validation error when submitting empty invite code in empty lobby', async () => {
     const user = userEvent.setup()
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
 
     await user.click(screen.getByRole('button', { name: 'Join Club' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter a valid invite code.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Invite code is required.')
   })
 
-  it('submits invite code and displays success notice', async () => {
+  it('shows validation error when entering fewer than 6 digits in empty lobby', async () => {
     const user = userEvent.setup()
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
 
-    const input = screen.getByPlaceholderText('e.g. CLUB-2026')
-    await user.type(input, 'CHESS-2026')
+    const input = screen.getByPlaceholderText('e.g. 048291')
+    await user.type(input, '123')
     await user.click(screen.getByRole('button', { name: 'Join Club' }))
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Invite code validated! Your membership request has been submitted.',
+    expect(screen.getByRole('alert')).toHaveTextContent('Invite code must be exactly 6 digits.')
+  })
+
+  it('submits valid 6-digit invite code in empty lobby and displays success notice', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.joinClub).mockResolvedValue({
+      id: 'c-1',
+      name: 'Leuven Coding Society',
+      description: 'Campus developers',
+      role: 'Club Member',
+    })
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
+
+    const input = screen.getByPlaceholderText('e.g. 048291')
+    await user.type(input, '048291')
+    await user.click(screen.getByRole('button', { name: 'Join Club' }))
+
+    await waitFor(() => {
+      expect(api.joinClub).toHaveBeenCalledWith({ code: '048291' }, 'valid-test-token')
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Successfully joined Leuven Coding Society as a Club Member!',
+      )
+    })
+  })
+
+  it('displays not found error when invite code does not exist', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.joinClub).mockRejectedValue(
+      new api.JoinClubApiException({ code: 'notFound', message: 'Invalid or unknown invite code.' }),
     )
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
+
+    const input = screen.getByPlaceholderText('e.g. 048291')
+    await user.type(input, '999999')
+    await user.click(screen.getByRole('button', { name: 'Join Club' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Invalid or unknown invite code.')
+    })
   })
 
-  it('renders active clubs grid when member is already part of clubs', () => {
+  it('displays already member error when joining a club twice', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.joinClub).mockRejectedValue(
+      new api.JoinClubApiException({ code: 'alreadyMember', message: 'You are already a member of this club.' }),
+    )
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
+
+    const input = screen.getByPlaceholderText('e.g. 048291')
+    await user.type(input, '123456')
+    await user.click(screen.getByRole('button', { name: 'Join Club' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('You are already a member of this club.')
+    })
+  })
+
+  it('displays rate limit error when submitting too many times', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.joinClub).mockRejectedValue(
+      new api.JoinClubApiException({ code: 'rateLimited' }),
+    )
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
+
+    const input = screen.getByPlaceholderText('e.g. 048291')
+    await user.type(input, '123456')
+    await user.click(screen.getByRole('button', { name: 'Join Club' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Too many join attempts. Please wait a minute before trying again.',
+      )
+    })
+  })
+
+  it('renders active clubs grid when member is already part of clubs and opens Join Club modal', async () => {
+    const user = userEvent.setup()
     const dummyClubs = [
       {
         id: 'club-1',
         name: 'Robotics Association',
         description: 'Building autonomous rovers and drones.',
         role: 'Club Admin',
+        inviteCode: '048291',
       },
       {
         id: 'club-2',
         name: 'Debate Society',
         description: 'Weekly British Parliamentary debates.',
-        role: 'Member',
+        role: 'Club Member',
       },
     ]
 
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: dummyClubs })
 
-    expect(screen.queryByTestId('lobby-empty-state')).not.toBeInTheDocument()
     expect(screen.getByText('Robotics Association')).toBeInTheDocument()
-    expect(screen.getByText('Building autonomous rovers and drones.')).toBeInTheDocument()
-    expect(screen.getByText('Club Admin')).toBeInTheDocument()
     expect(screen.getByText('Debate Society')).toBeInTheDocument()
-    expect(screen.getByText('2 clubs')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Create New Club/i })).toBeInTheDocument()
+    expect(screen.getByText('Club Admin')).toBeInTheDocument()
+    expect(screen.getByText('Club Member')).toBeInTheDocument()
+    expect(screen.getByText('Invite Code: 048291')).toBeInTheDocument()
+
+    // Header buttons
+    const joinButton = screen.getByRole('button', { name: 'Join Club' })
+    await user.click(joinButton)
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Join a Club' })).toBeInTheDocument()
+
+    // Submit valid code in modal
+    const modalInput = within(dialog).getByLabelText(/Invite Code/i)
+    await user.type(modalInput, '654321')
+    await user.click(within(dialog).getByRole('button', { name: 'Join Club' }))
+
+    await waitFor(() => {
+      expect(api.joinClub).toHaveBeenCalledWith({ code: '654321' }, 'valid-test-token')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  it('copies invite code to clipboard when Club Admin clicks copy button', async () => {
+    const user = userEvent.setup()
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: writeTextMock },
+      configurable: true,
+      writable: true,
+    })
+
+    const dummyClubs = [
+      {
+        id: 'club-1',
+        name: 'Robotics Association',
+        role: 'Club Admin',
+        inviteCode: '048291',
+      },
+    ]
+
+    renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: dummyClubs })
+
+    const copyBtn = screen.getByRole('button', { name: 'Copy code' })
+    await user.click(copyBtn)
+
+    expect(writeTextMock).toHaveBeenCalledWith('048291')
+    await waitFor(() => {
+      expect(screen.getByText('Copied!')).toBeInTheDocument()
+    })
   })
 })

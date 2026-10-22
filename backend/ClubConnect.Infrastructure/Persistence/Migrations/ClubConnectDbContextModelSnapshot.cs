@@ -45,6 +45,41 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.ToTable("Clubs", (string)null);
                 });
 
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubInvite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId")
+                        .HasDatabaseName("IX_ClubInvites_ClubId");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ClubInvites_Code");
+
+                    b.ToTable("ClubInvites", (string)null);
+                });
+
             modelBuilder.Entity("ClubConnect.Domain.Entities.Member", b =>
                 {
                     b.Property<Guid>("Id")
@@ -109,6 +144,17 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.ToTable("Memberships", (string)null);
                 });
 
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubInvite", b =>
+                {
+                    b.HasOne("ClubConnect.Domain.Entities.Club", "Club")
+                        .WithMany("Invites")
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Club");
+                });
+
             modelBuilder.Entity("ClubConnect.Domain.Entities.Membership", b =>
                 {
                     b.HasOne("ClubConnect.Domain.Entities.Club", "Club")
@@ -130,6 +176,8 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ClubConnect.Domain.Entities.Club", b =>
                 {
+                    b.Navigation("Invites");
+
                     b.Navigation("Memberships");
                 });
 
