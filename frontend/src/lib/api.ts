@@ -282,6 +282,26 @@ export async function getMemberClubs(
   return (await res.json()) as ClubDto[]
 }
 
+export async function getClubDetails(
+  clubId: string,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubDto> {
+  const res = await fetchFn(`/api/clubs/${clubId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch club details (${res.status})`)
+  }
+
+  return (await res.json()) as ClubDto
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string

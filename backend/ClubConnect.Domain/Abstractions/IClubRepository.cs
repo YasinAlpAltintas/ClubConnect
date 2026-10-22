@@ -62,6 +62,15 @@ public interface IClubRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Retrieves a specific club for a member, verifying that the member belongs to the club.
+    /// Returns <c>null</c> if the club does not exist or the member has no active membership in it.
+    /// </summary>
+    Task<ClubMembershipSummary?> GetClubForMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Finds a club by its unique identifier.
     /// </summary>
     Task<Club?> GetByIdAsync(
