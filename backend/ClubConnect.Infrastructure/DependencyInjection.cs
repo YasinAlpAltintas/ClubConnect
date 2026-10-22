@@ -14,6 +14,7 @@ namespace ClubConnect.Infrastructure;
 /// <ul>
 ///   <li>EF Core <see cref="ClubConnectDbContext"/> backed by Npgsql.</li>
 ///   <li><see cref="IMemberRepository"/> bound to <see cref="MemberRepository"/>.</li>
+///   <li><see cref="IClubRepository"/> bound to <see cref="ClubRepository"/>.</li>
 ///   <li><see cref="IPasswordHasher"/> bound to <see cref="Argon2PasswordHasher"/>
 ///       (OWASP-minimum parameters; overridable via configuration).</li>
 /// </ul>
@@ -49,6 +50,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IMemberRepository, MemberRepository>();
+        services.AddScoped<IClubRepository, ClubRepository>();
 
         return services;
     }
