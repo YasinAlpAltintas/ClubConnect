@@ -64,19 +64,6 @@ export default function ClubSwitcherDropdown({
           <span className="font-semibold text-slate-800 truncate max-w-[180px]">
             {activeClub.name}
           </span>
-          {activeClub.role && (
-            <span
-              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
-                activeClub.role === 'Club Admin'
-                  ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                  : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
-              }`}
-            >
-              {activeClub.role === 'Club Admin'
-                ? t('clubSwitcher.roleAdmin')
-                : t('clubSwitcher.roleMember')}
-            </span>
-          )}
         </div>
       </div>
     )

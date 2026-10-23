@@ -48,7 +48,6 @@ describe('ClubSwitcherDropdown', () => {
 
     expect(screen.getByTestId('single-club-indicator')).toBeInTheDocument()
     expect(screen.getByText('Leuven Coding Society')).toBeInTheDocument()
-    expect(screen.getByText('Club Admin')).toBeInTheDocument()
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Switch club/i })).not.toBeInTheDocument()
   })
