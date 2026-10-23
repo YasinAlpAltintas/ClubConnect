@@ -324,7 +324,7 @@ export default function LobbyPage({
         </section>
 
         {/* Active Club Workspace Banner */}
-        {activeClub && clubs.length > 0 && (
+        {activeClub && clubs.length > 1 && (
           <section
             data-testid="active-club-workspace"
             aria-label="Active Club Workspace"
