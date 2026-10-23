@@ -27,6 +27,7 @@ export interface LobbyPageProps {
   onLogout: () => void
   onSessionExpired?: () => void
   initialClubs?: ClubDto[]
+  onEnterDashboard?: (clubId: string) => void
 }
 
 type ModalType = 'explore' | 'create' | 'join' | null
@@ -36,6 +37,7 @@ export default function LobbyPage({
   onLogout,
   onSessionExpired,
   initialClubs,
+  onEnterDashboard,
 }: LobbyPageProps) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()

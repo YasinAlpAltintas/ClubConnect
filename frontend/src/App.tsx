@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import LobbyPage, { type AuthenticatedMember } from './pages/LobbyPage'
+import DashboardPage from './pages/DashboardPage'
 import {
   getTokenRemainingTimeMs,
   getStoredToken,
@@ -12,7 +13,7 @@ import {
 } from './lib/jwt'
 import { logoutMember } from './lib/api'
 
-export type AppView = 'register' | 'login' | 'lobby'
+export type AppView = 'register' | 'login' | 'lobby' | 'dashboard'
 
 export interface AppProps {
   initialView?: AppView
@@ -39,6 +40,8 @@ function resolveInitialState(
         resolvedView = 'login'
       } else if (window.location.hash === '#login') {
         resolvedView = 'login'
+      } else if (window.location.hash.startsWith('#dashboard')) {
+        resolvedView = initialMember ? 'dashboard' : 'login'
       } else if (window.location.hash === '#lobby') {
         resolvedView = initialMember ? 'lobby' : 'login'
       } else if (window.location.hash === '#register') {
@@ -84,6 +87,8 @@ function resolveInitialState(
       }
     } else if (typeof window !== 'undefined' && window.location.hash === '#login') {
       view = 'login'
+    } else if (typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
+      view = member ? 'dashboard' : 'login'
     } else if (typeof window !== 'undefined' && window.location.hash === '#lobby') {
       view = member ? 'lobby' : 'login'
     } else if (typeof window !== 'undefined' && window.location.hash === '#register') {
@@ -118,6 +123,8 @@ export default function App({
         setView('login')
       } else if (hash === '#register') {
         setView('register')
+      } else if (hash.startsWith('#dashboard')) {
+        setView(member ? 'dashboard' : 'login')
       } else if (hash === '#lobby') {
         setView('lobby')
       }
@@ -142,7 +149,7 @@ export default function App({
   }
 
   useEffect(() => {
-    if (!member?.token || view !== 'lobby') {
+    if (!member?.token || (view !== 'lobby' && view !== 'dashboard')) {
       return
     }
 
@@ -169,6 +176,7 @@ export default function App({
             navigateTo('login')
           }}
           onSessionExpired={handleExpireSession}
+          onEnterDashboard={() => navigateTo('dashboard')}
         />
       )
     }
@@ -182,6 +190,44 @@ export default function App({
           setSessionExpired(false)
           setMember(authMember)
           navigateTo('lobby')
+        }}
+        onNavigateToRegister={() => {
+          setSessionExpired(false)
+          navigateTo('register')
+        }}
+      />
+    )
+  }
+
+  if (view === 'dashboard') {
+    if (member) {
+      return (
+        <DashboardPage
+          member={member}
+          onLogout={() => {
+            if (member?.token) {
+              void logoutMember(member.token)
+            }
+            removeStoredToken()
+            setMember(null)
+            setSessionExpired(false)
+            navigateTo('login')
+          }}
+          onNavigateToLobby={() => navigateTo('lobby')}
+          onSessionExpired={handleExpireSession}
+        />
+      )
+    }
+    return (
+      <LoginPage
+        sessionExpired={sessionExpired}
+        onLoginSuccess={(authMember) => {
+          if (authMember.token) {
+            setStoredToken(authMember.token)
+          }
+          setSessionExpired(false)
+          setMember(authMember)
+          navigateTo('dashboard')
         }}
         onNavigateToRegister={() => {
           setSessionExpired(false)

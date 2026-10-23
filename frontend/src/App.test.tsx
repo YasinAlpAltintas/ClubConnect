@@ -22,7 +22,7 @@ const mockedLogin = vi.mocked(loginMember)
 const mockedCheckEmail = vi.mocked(checkEmailExists)
 const mockedLogout = vi.mocked(logoutMember)
 
-function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
+function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby' | 'dashboard'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -276,5 +276,55 @@ describe('App navigation flows', () => {
     })
     expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
   })
-})
+  it('renders dashboard view when authenticated and navigating to #dashboard', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
 
+    window.location.hash = '#dashboard'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(screen.getByTestId('club-dashboard-page')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Back to Lobby/i })).toBeInTheDocument()
+  })
+
+  it('navigates from dashboard back to lobby when clicking Back to Lobby', async () => {
+    const user = userEvent.setup()
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    const backBtn = screen.getByRole('button', { name: /Back to Lobby/i })
+    await user.click(backBtn)
+
+    expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#lobby')
+  })
+
+  it('navigates to login view if an unauthenticated user enters #dashboard', async () => {
+    window.location.hash = '#dashboard'
+    renderApp({
+      initialMember: null,
+    })
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+  })
+})
