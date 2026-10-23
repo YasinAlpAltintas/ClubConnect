@@ -376,4 +376,146 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
 
         Assert.Equal(HttpStatusCode.TooManyRequests, res6.StatusCode);
     }
+
+    [Fact]
+    public async Task GetClubById_WithoutToken_Returns401Unauthorized()
+    {
+        var randomClubId = Guid.NewGuid();
+        using var response = await _fixture.Client.GetAsync($"{ClubsUrl}/{randomClubId}");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubById_WithExpiredToken_Returns401Unauthorized()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var expiredToken = jwtService.GenerateToken(new Domain.Entities.Member
+        {
+            Id = Guid.NewGuid(),
+            Email = "expired-club-reader@example.com",
+            DisplayName = "Expired Reader"
+        }, TimeSpan.FromSeconds(-30));
+
+        var randomClubId = Guid.NewGuid();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{randomClubId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", expiredToken);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubById_WithNonExistentClub_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("reader-notfound");
+        var nonExistentId = Guid.NewGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{nonExistentId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("not_found", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubById_WhenUserNotMember_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("admin-owner");
+        var outsiderToken = await RegisterAndLoginAsync("outsider-user");
+
+        // Admin creates a club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Private Members Society" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        // Outsider attempts to fetch the club details
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", outsiderToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, getRes.StatusCode);
+        var body = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("forbidden", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubById_WhenUserIsAdmin_Returns200OK_WithInviteCode()
+    {
+        var adminToken = await RegisterAndLoginAsync("admin-checker");
+
+        // 1. Admin creates a club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new
+            {
+                name = "Leuven Robotics Team",
+                description = "Robotics and hardware building."
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Admin retrieves club by ID
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var detail = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(clubId, detail.GetProperty("id").GetString());
+        Assert.Equal("Leuven Robotics Team", detail.GetProperty("name").GetString());
+        Assert.Equal("Robotics and hardware building.", detail.GetProperty("description").GetString());
+        Assert.Equal("Club Admin", detail.GetProperty("role").GetString());
+        Assert.Equal(inviteCode, detail.GetProperty("inviteCode").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubById_WhenUserIsMember_Returns200OK_WithNullInviteCode()
+    {
+        var adminToken = await RegisterAndLoginAsync("admin-inviter");
+        var memberToken = await RegisterAndLoginAsync("member-joined");
+
+        // 1. Admin creates club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Astronomy Club" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Member retrieves club details by ID
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var detail = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(clubId, detail.GetProperty("id").GetString());
+        Assert.Equal("Astronomy Club", detail.GetProperty("name").GetString());
+        Assert.Equal("Club Member", detail.GetProperty("role").GetString());
+        Assert.True(detail.GetProperty("inviteCode").ValueKind == JsonValueKind.Null);
+    }
 }
