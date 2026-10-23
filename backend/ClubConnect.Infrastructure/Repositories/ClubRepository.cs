@@ -144,6 +144,40 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
             .ToList();
     }
 
+    public async Task<ClubMembershipSummary?> GetClubForMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        var membership = await context.Memberships
+            .AsNoTracking()
+            .Where(m => m.ClubId == clubId && m.MemberId == memberId)
+            .Select(m => new
+            {
+                m.ClubId,
+                Name = m.Club!.Name,
+                Description = m.Club.Description,
+                Role = m.Role,
+                InviteCode = m.Role == "Club Admin"
+                    ? m.Club.Invites.Where(i => i.IsActive).Select(i => i.Code).FirstOrDefault()
+                    : null
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            return null;
+        }
+
+        return new ClubMembershipSummary(
+            membership.ClubId,
+            membership.Name,
+            membership.Description,
+            membership.Role,
+            membership.InviteCode);
+    }
+
     public Task<Club?> GetByIdAsync(Guid clubId, CancellationToken cancellationToken)
     {
         return context.Clubs

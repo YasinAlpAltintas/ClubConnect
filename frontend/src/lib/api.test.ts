@@ -10,6 +10,7 @@ import {
   getAuthProfile,
   logoutMember,
   getMemberClubs,
+  getClubDetails,
   createClub,
   CreateClubApiException,
   joinClub,
@@ -447,6 +448,52 @@ describe('getMemberClubs', () => {
   it('throws error when server responds with non-ok status', async () => {
     const fetchFn = (async () => jsonResponse({ error: 'unauthorized' }, 401)) as typeof fetch
     await expect(getMemberClubs('bad-token', fetchFn)).rejects.toThrow('Failed to fetch member clubs (401)')
+  })
+})
+
+describe('getClubDetails', () => {
+  const dummyClub = {
+    id: 'club-123',
+    name: 'Leuven Coding Society',
+    description: 'Tech student group',
+    role: 'Club Admin',
+    inviteCode: '048291',
+  }
+
+  it('calls GET /api/clubs/:id with bearer token and returns club details', async () => {
+    let capturedUrl = ''
+    let capturedInit: RequestInit | undefined
+
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      capturedUrl = String(url)
+      capturedInit = init
+      return jsonResponse(dummyClub, 200)
+    }) as typeof fetch
+
+    const result = await getClubDetails('club-123', 'test-token', fetchFn)
+
+    expect(capturedUrl).toBe('/api/clubs/club-123')
+    expect(capturedInit?.method).toBe('GET')
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBe('Bearer test-token')
+    expect(result).toEqual(dummyClub)
+  })
+
+  it('calls GET /api/clubs/:id without authorization header when token is omitted', async () => {
+    let capturedInit: RequestInit | undefined
+
+    const fetchFn = (async (_url: string | URL | Request, init?: RequestInit) => {
+      capturedInit = init
+      return jsonResponse(dummyClub, 200)
+    }) as typeof fetch
+
+    const result = await getClubDetails('club-123', undefined, fetchFn)
+    expect(result).toEqual(dummyClub)
+    expect((capturedInit?.headers as Record<string, string>)?.Authorization).toBeUndefined()
+  })
+
+  it('throws error when server responds with non-ok status', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'forbidden' }, 403)) as typeof fetch
+    await expect(getClubDetails('club-secret', 'token', fetchFn)).rejects.toThrow('Failed to fetch club details (403)')
   })
 })
 

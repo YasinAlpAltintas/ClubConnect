@@ -196,4 +196,56 @@ public class ClubsController(
         var clubs = await clubRepository.GetClubsForMemberAsync(validation.MemberId.Value, cancellationToken).ConfigureAwait(false);
         return Ok(clubs);
     }
+
+    /// <summary>
+    /// Retrieves details of a specific club workspace for the authenticated member.
+    /// Enforces tenant isolation: 200 → club details · 401 → unauthenticated · 403 → forbidden (not a member) · 404 → club not found.
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ClubMembershipSummary), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClubById([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (clubRepository is null)
+        {
+            return NotFound(new { error = "not_found", detail = "Club not found." });
+        }
+
+        // Verify if club exists at all
+        var club = await clubRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (club is null)
+        {
+            return NotFound(new { error = "not_found", detail = "Club not found." });
+        }
+
+        // Verify tenant isolation: does the authenticated member belong to this club?
+        var summary = await clubRepository.GetClubForMemberAsync(id, validation.MemberId.Value, cancellationToken).ConfigureAwait(false);
+        if (summary is null)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = "You do not have access to this club workspace." });
+        }
+
+        return Ok(summary);
+    }
 }

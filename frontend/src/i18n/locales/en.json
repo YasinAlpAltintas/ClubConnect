@@ -7,6 +7,16 @@
     "language": "Language",
     "languageToggle": "Nederlands"
   },
+  "clubSwitcher": {
+    "label": "Switch club",
+    "activeWorkspace": "Active Workspace",
+    "currentClub": "Current Club",
+    "switchClub": "Switch club",
+    "selectClub": "Select a club",
+    "allClubs": "All Clubs (Lobby)",
+    "roleAdmin": "Club Admin",
+    "roleMember": "Club Member"
+  },
   "nav": {
     "toLogin": "Already have an account? Log in",
     "toRegister": "Don't have an account yet? Register"
@@ -68,6 +78,10 @@
     "loading": "Loading your clubs…",
     "createNewClub": "Create New Club",
     "joinClub": "Join Club",
+    "activeWorkspaceTitle": "Active Club Workspace",
+    "activeWorkspaceSubtitle": "You are currently working in this club's workspace.",
+    "switchToClub": "Switch to workspace",
+    "currentlyActive": "Active",
     "inviteCodeBadge": "Invite Code: {{code}}",
     "copyInviteCode": "Copy code",
     "inviteCodeCopied": "Copied!",
