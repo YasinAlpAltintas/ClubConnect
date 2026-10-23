@@ -1003,38 +1003,38 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-yes">169x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1209,7 +1209,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">193x</span>
+<span class="cline-any cline-yes">169x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1559,8 +1559,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">44x</span>
-<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">37x</span>
+<span class="cline-any cline-yes">37x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1971,7 +1971,7 @@ export default function LobbyPage({
     try {
       const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
-      setActiveClubId(joined.clubId)
+      setActiveClubId(joined.id)
       setCodeSubmitted(true)
       setEmptySuccessMessage(t('lobby.empty.codeSuccess', { name: joined.name }))
       setInviteCode('')
@@ -2083,7 +2083,7 @@ export default function LobbyPage({
     try {
       const joined = await joinClub({ code: parsed.data.code }, member.token)
       await queryClient.invalidateQueries({ queryKey: ['memberClubs', member.token] })
-      setActiveClubId(joined.clubId)
+      setActiveClubId(joined.id)
       closeModal()
     } catch (err: unknown) {
 <span class="cstat-no" title="statement not covered" >      if (err instanceof JoinClubApiException) {</span>
@@ -2197,15 +2197,15 @@ export default function LobbyPage({
             aria-label="Active Club Workspace"
             className="mb-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xs ring-1 ring-slate-800 sm:p-8"
           &gt;
-            &lt;div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"&gt;
+            &lt;div data-testid="active-workspace-banner" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"&gt;
               &lt;div&gt;
                 &lt;div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-indigo-400"&gt;
                   &lt;span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" /&gt;
-                  &lt;span&gt;{t('lobby.activeWorkspaceTitle')}&lt;/span&gt;
+                  &lt;h2&gt;{t('lobby.activeWorkspaceTitle')}&lt;/h2&gt;
                 &lt;/div&gt;
-                &lt;h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl"&gt;
+                &lt;div className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl" data-testid="active-workspace-club-name"&gt;
                   {activeClub.name}
-                &lt;/h2&gt;
+                &lt;/div&gt;
                 {activeClub.description ? (
                   &lt;p className="mt-2 text-sm text-slate-300 max-w-2xl leading-relaxed"&gt;
                     {activeClub.description}
@@ -2773,7 +2773,7 @@ export default function LobbyPage({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-22T16:28:31.067Z
+                at 2026-10-23T09:04:39.863Z
             </div>
         <script src="../prettify.js"></script>
         <script>

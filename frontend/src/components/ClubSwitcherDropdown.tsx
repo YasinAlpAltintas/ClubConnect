@@ -59,23 +59,25 @@ export default function ClubSwitcherDropdown({
         data-testid="single-club-indicator"
         className="flex items-center space-x-2 rounded-xl bg-slate-100/90 px-3 py-1.5 text-xs ring-1 ring-slate-200/70"
       >
-        <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-        <span className="font-semibold text-slate-800 truncate max-w-[180px]">
-          {activeClub.name}
-        </span>
-        {activeClub.role && (
-          <span
-            className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
-              activeClub.role === 'Club Admin'
-                ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
-            }`}
-          >
-            {activeClub.role === 'Club Admin'
-              ? t('clubSwitcher.roleAdmin')
-              : t('clubSwitcher.roleMember')}
+        <div data-testid="club-switcher-single" className="flex items-center space-x-2">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+          <span className="font-semibold text-slate-800 truncate max-w-[180px]">
+            {activeClub.name}
           </span>
-        )}
+          {activeClub.role && (
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                activeClub.role === 'Club Admin'
+                  ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                  : 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+              }`}
+            >
+              {activeClub.role === 'Club Admin'
+                ? t('clubSwitcher.roleAdmin')
+                : t('clubSwitcher.roleMember')}
+            </span>
+          )}
+        </div>
       </div>
     )
   }
@@ -129,6 +131,7 @@ export default function ClubSwitcherDropdown({
         ref={triggerRef}
         type="button"
         id="club-switcher-button"
+        data-testid="club-switcher-trigger"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         aria-haspopup="listbox"

@@ -330,15 +330,15 @@ export default function LobbyPage({
             aria-label="Active Club Workspace"
             className="mb-8 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xs ring-1 ring-slate-800 sm:p-8"
           >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div data-testid="active-workspace-banner" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-indigo-400">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-                  <span>{t('lobby.activeWorkspaceTitle')}</span>
+                  <h2>{t('lobby.activeWorkspaceTitle')}</h2>
                 </div>
-                <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                <div className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl" data-testid="active-workspace-club-name">
                   {activeClub.name}
-                </h2>
+                </div>
                 {activeClub.description ? (
                   <p className="mt-2 text-sm text-slate-300 max-w-2xl leading-relaxed">
                     {activeClub.description}

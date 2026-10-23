@@ -149,7 +149,7 @@ test.describe('INC-14: Switch Between Clubs', () => {
     // 4. Switch back to "Leuven Robotics Club" using the card "Switch to workspace" CTA in the grid
     const roboticsCard = page.locator('article').filter({ hasText: 'Leuven Robotics Club' })
     await expect(roboticsCard).toBeVisible()
-    await roboticsCard.getByRole('button', { name: /Switch to workspace|Schakel naar werkruimte/i }).click()
+    await roboticsCard.getByRole('button', { name: /Switch to workspace|Wissel naar werkruimte|Schakel naar werkruimte/i }).click()
 
     // Header switcher and banner immediately update back
     await expect(switcherTrigger).toContainText('Leuven Robotics Club')
@@ -184,17 +184,13 @@ test.describe('INC-14: Switch Between Clubs', () => {
     await expect(page.getByTestId('club-switcher-single')).toContainText('Sole Club Alpha')
     await expect(page.getByTestId('club-switcher-trigger')).not.toBeVisible()
 
-    // Log out
-    await page.getByRole('button', { name: /Log out|Uitloggen/ }).click()
+    // Log out (first matching logout button in header)
+    await page.getByRole('button', { name: /Log out|Uitloggen/ }).first().click()
 
-    // 2. Zero-club user
-    await page.getByRole('button', { name: /Create account|Account aanmaken/ }).click()
-    await page.fill('#email', zeroEmail)
-    await page.fill('#password', password)
-    await page.click('button[type="submit"]')
+    // 2. Zero-club user: register via API and log in on login view
+    await request.post('/api/auth/register', { data: { email: zeroEmail, password } })
 
     // Log in with zero-club user
-    await page.getByRole('button', { name: /Log in|Inloggen/ }).click()
     await page.fill('#email', zeroEmail)
     await page.fill('#password', password)
     await page.click('button[type="submit"]')

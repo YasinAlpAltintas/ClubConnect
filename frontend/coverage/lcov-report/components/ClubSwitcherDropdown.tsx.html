@@ -288,7 +288,10 @@
 <a name='L223'></a><a href='#L223'>223</a>
 <a name='L224'></a><a href='#L224'>224</a>
 <a name='L225'></a><a href='#L225'>225</a>
-<a name='L226'></a><a href='#L226'>226</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -304,18 +307,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
-<span class="cline-any cline-yes">213x</span>
-<span class="cline-any cline-yes">213x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
-<span class="cline-any cline-yes">213x</span>
-<span class="cline-any cline-yes">213x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
+<span class="cline-any cline-yes">189x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
+<span class="cline-any cline-yes">189x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -331,20 +334,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
+<span class="cline-any cline-yes">189x</span>
 <span class="cline-any cline-yes">45x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">213x</span>
-<span class="cline-any cline-yes">170x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">150x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">43x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">39x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -413,7 +418,8 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">35x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -574,23 +580,25 @@ export default function ClubSwitcherDropdown({
         data-testid="single-club-indicator"
         className="flex items-center space-x-2 rounded-xl bg-slate-100/90 px-3 py-1.5 text-xs ring-1 ring-slate-200/70"
       &gt;
-        &lt;span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /&gt;
-        &lt;span className="font-semibold text-slate-800 truncate max-w-[180px]"&gt;
-          {activeClub.name}
-        &lt;/span&gt;
-        {activeClub.role &amp;&amp; (
-          &lt;span
-            className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
-              activeClub.role === 'Club Admin'
-                ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                : <span class="branch-1 cbranch-no" title="branch not covered" >'bg-indigo-50 text-indigo-700 ring-indigo-600/20'</span>
-            }`}
-          &gt;
-            {activeClub.role === 'Club Admin'
-              ? t('clubSwitcher.roleAdmin')
-              : <span class="branch-1 cbranch-no" title="branch not covered" >t('clubSwitcher.roleMember')}</span>
+        &lt;div data-testid="club-switcher-single" className="flex items-center space-x-2"&gt;
+          &lt;span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" /&gt;
+          &lt;span className="font-semibold text-slate-800 truncate max-w-[180px]"&gt;
+            {activeClub.name}
           &lt;/span&gt;
-        )}
+          {activeClub.role &amp;&amp; (
+            &lt;span
+              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                activeClub.role === 'Club Admin'
+                  ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                  : <span class="branch-1 cbranch-no" title="branch not covered" >'bg-indigo-50 text-indigo-700 ring-indigo-600/20'</span>
+              }`}
+            &gt;
+              {activeClub.role === 'Club Admin'
+                ? t('clubSwitcher.roleAdmin')
+                : <span class="branch-1 cbranch-no" title="branch not covered" >t('clubSwitcher.roleMember')}</span>
+            &lt;/span&gt;
+          )}
+        &lt;/div&gt;
       &lt;/div&gt;
     )
   }
@@ -644,6 +652,7 @@ export default function ClubSwitcherDropdown({
         ref={triggerRef}
         type="button"
         id="club-switcher-button"
+        data-testid="club-switcher-trigger"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
         aria-haspopup="listbox"
@@ -745,7 +754,7 @@ export default function ClubSwitcherDropdown({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-22T16:28:31.067Z
+                at 2026-10-23T09:04:39.863Z
             </div>
         <script src="../prettify.js"></script>
         <script>
