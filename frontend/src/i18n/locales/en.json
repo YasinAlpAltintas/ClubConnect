@@ -81,6 +81,7 @@
     "activeWorkspaceTitle": "Active Club Workspace",
     "activeWorkspaceSubtitle": "You are currently working in this club's workspace.",
     "switchToClub": "Switch to workspace",
+    "enterDashboard": "Enter Dashboard",
     "currentlyActive": "Active",
     "inviteCodeBadge": "Invite Code: {{code}}",
     "copyInviteCode": "Copy code",

@@ -438,4 +438,47 @@ describe('LobbyPage', () => {
     const workspace = screen.getByTestId('active-club-workspace')
     expect(within(workspace).getByText('Club 2')).toBeInTheDocument()
   })
+
+  it('renders Enter Dashboard buttons and triggers onEnterDashboard when clicked', async () => {
+    const user = userEvent.setup()
+    const handleEnterDashboard = vi.fn()
+    const multiClubs = [
+      {
+        id: 'club-1',
+        name: 'Club 1',
+        description: 'Desc 1',
+        role: 'Club Admin',
+      },
+      {
+        id: 'club-2',
+        name: 'Club 2',
+        description: 'Desc 2',
+        role: 'Club Member',
+      },
+    ]
+
+    renderLobbyPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      initialClubs: multiClubs,
+      onEnterDashboard: handleEnterDashboard,
+    })
+
+    // Verify Enter Dashboard buttons exist
+    const enterClub1Btn = screen.getByTestId('enter-dashboard-club-1')
+    const enterClub2Btn = screen.getByTestId('enter-dashboard-club-2')
+    const enterActiveBtn = screen.getByTestId('enter-active-dashboard-btn')
+
+    expect(enterClub1Btn).toBeInTheDocument()
+    expect(enterClub2Btn).toBeInTheDocument()
+    expect(enterActiveBtn).toBeInTheDocument()
+
+    // Click Enter Dashboard on club-2
+    await user.click(enterClub2Btn)
+    expect(handleEnterDashboard).toHaveBeenCalledWith('club-2')
+
+    // Click Enter Dashboard on active workspace hero
+    await user.click(enterActiveBtn)
+    expect(handleEnterDashboard).toHaveBeenCalledWith('club-2')
+  })
 })

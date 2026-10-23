@@ -81,6 +81,7 @@
     "activeWorkspaceTitle": "Actieve club werkruimte",
     "activeWorkspaceSubtitle": "Je werkt momenteel in de werkruimte van deze club.",
     "switchToClub": "Wissel naar werkruimte",
+    "enterDashboard": "Naar Dashboard",
     "currentlyActive": "Actief",
     "inviteCodeBadge": "Uitnodigingscode: {{code}}",
     "copyInviteCode": "Kopieer code",
