@@ -255,7 +255,7 @@ jobs:
 
     if: >-
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/develop' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
       (github.repository == 'yasinalpaltintas/ClubConnect' || github.repository == 'YasinAlpAltintas/ClubConnect')
 
     permissions:
