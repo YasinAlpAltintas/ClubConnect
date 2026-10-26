@@ -12,17 +12,21 @@ vi.mock('./lib/api', async (importOriginal) => {
     registerMember: vi.fn(),
     checkEmailExists: vi.fn(),
     logoutMember: vi.fn(),
+    getMemberClubs: vi.fn(),
+    getClubDetails: vi.fn(),
   }
 })
 
-import { loginMember, checkEmailExists, logoutMember } from './lib/api'
+import { loginMember, checkEmailExists, logoutMember, getMemberClubs, getClubDetails } from './lib/api'
 import { TOKEN_STORAGE_KEY } from './lib/jwt'
 
 const mockedLogin = vi.mocked(loginMember)
 const mockedCheckEmail = vi.mocked(checkEmailExists)
 const mockedLogout = vi.mocked(logoutMember)
+const mockedGetMemberClubs = vi.mocked(getMemberClubs)
+const mockedGetClubDetails = vi.mocked(getClubDetails)
 
-function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
+function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby' | 'dashboard'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -41,6 +45,8 @@ describe('App navigation flows', () => {
     vi.clearAllMocks()
     window.location.hash = ''
     window.localStorage.clear()
+    mockedGetMemberClubs.mockResolvedValue([{ id: 'club-1', name: 'Leuven Robotics Club', role: 'Club Admin' }])
+    mockedGetClubDetails.mockResolvedValue({ id: 'club-1', name: 'Leuven Robotics Club', role: 'Club Admin' })
   })
 
   it('renders register view by default and navigates to login view', async () => {
@@ -276,5 +282,91 @@ describe('App navigation flows', () => {
     })
     expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired. Please log in again.')
   })
-})
+  it('renders dashboard view when authenticated and navigating to #dashboard', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
 
+    window.location.hash = '#dashboard'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(await screen.findByTestId('club-dashboard-page')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Back to Lobby/i })).toBeInTheDocument()
+  })
+
+  it('navigates from dashboard back to lobby when clicking Back to Lobby', async () => {
+    const user = userEvent.setup()
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    const backBtn = await screen.findByTestId('back-to-lobby-btn')
+    await user.click(backBtn)
+
+    expect(await screen.findByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+    expect(window.location.hash).toBe('#lobby')
+  })
+
+  it('navigates to login view if an unauthenticated user enters #dashboard', async () => {
+    window.location.hash = '#dashboard'
+    renderApp({
+      initialMember: null,
+    })
+
+    expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
+  })
+  it('activates specific club when navigating to #dashboard/:clubId', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    window.location.hash = '#dashboard/club-1'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(await screen.findByTestId('club-dashboard-page')).toBeInTheDocument()
+  })
+  it('displays access denied when navigating to non-member club #dashboard/:clubId', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    window.location.hash = '#dashboard/unknown-club'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(await screen.findByTestId('dashboard-access-denied')).toBeInTheDocument()
+  })
+})

@@ -296,7 +296,9 @@ export async function getClubDetails(
   })
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch club details (${res.status})`)
+    const error = new Error(`Failed to fetch club details (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
   }
 
   return (await res.json()) as ClubDto

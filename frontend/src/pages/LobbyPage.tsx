@@ -27,6 +27,7 @@ export interface LobbyPageProps {
   onLogout: () => void
   onSessionExpired?: () => void
   initialClubs?: ClubDto[]
+  onEnterDashboard?: (clubId: string) => void
 }
 
 type ModalType = 'explore' | 'create' | 'join' | null
@@ -36,6 +37,7 @@ export default function LobbyPage({
   onLogout,
   onSessionExpired,
   initialClubs,
+  onEnterDashboard,
 }: LobbyPageProps) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
@@ -361,6 +363,14 @@ export default function LobbyPage({
                     {activeClub.role}
                   </span>
                 )}
+                <button
+                  type="button"
+                  data-testid="enter-active-dashboard-btn"
+                  onClick={() => onEnterDashboard?.(activeClub.id)}
+                  className="rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-900 shadow-xs hover:bg-slate-100 cursor-pointer transition-colors"
+                >
+                  {t('lobby.enterDashboard')} →
+                </button>
               </div>
             </div>
 
@@ -631,20 +641,34 @@ export default function LobbyPage({
                         {club.description}
                       </p>
                     )}
-                    <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100">
-                      {!isActive ? (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setActiveClubId(club.id)}
-                          className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                          data-testid={`enter-dashboard-${club.id}`}
+                          onClick={() => {
+                            setActiveClubId(club.id)
+                            onEnterDashboard?.(club.id)
+                          }}
+                          className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer transition-colors"
                         >
-                          {t('lobby.switchToClub')} →
+                          {t('lobby.enterDashboard')} →
                         </button>
-                      ) : (
-                        <span className="text-xs font-medium text-slate-400">
-                          {t('lobby.activeWorkspaceTitle')}
-                        </span>
-                      )}
+                        {!isActive ? (
+                          <button
+                            type="button"
+                            data-testid={`switch-club-${club.id}`}
+                            onClick={() => setActiveClubId(club.id)}
+                            className="inline-flex items-center text-xs font-medium text-slate-600 hover:text-indigo-600 cursor-pointer"
+                          >
+                            {t('lobby.switchToClub')} →
+                          </button>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-400">
+                            {t('lobby.activeWorkspaceTitle')}
+                          </span>
+                        )}
+                      </div>
                       {club.role === 'Club Admin' && club.inviteCode && (
                         <button
                           type="button"
