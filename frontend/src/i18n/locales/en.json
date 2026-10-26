@@ -152,5 +152,25 @@
   "success": {
     "title": "Account created",
     "message": "Welcome to ClubConnect, {{email}}. Your account is ready."
+  },
+  "dashboard": {
+    "title": "Club Dashboard",
+    "badge": "Club Workspace",
+    "backToLobby": "← Back to Lobby",
+    "accessDenied": "Access Denied",
+    "accessDeniedMessage": "You do not have access to this club or you are not a member.",
+    "roleAdmin": "Club Admin",
+    "roleMember": "Club Member",
+    "modules": {
+      "title": "Club Management Modules",
+      "subtitle": "Streamlined operations for your student organization.",
+      "calendarTitle": "Calendar & Events",
+      "calendarDesc": "Schedule club gatherings, matches, workshops, and team meetings.",
+      "tasksTitle": "Kanban Task Board",
+      "tasksDesc": "Assign responsibilities, organize sprints, and track board tasks together.",
+      "logisticsTitle": "Logistics & Inventory",
+      "logisticsDesc": "Manage club assets, venue reservations, and physical equipment.",
+      "comingSoon": "Coming Soon"
+    }
   }
 }

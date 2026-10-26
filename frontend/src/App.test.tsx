@@ -12,15 +12,19 @@ vi.mock('./lib/api', async (importOriginal) => {
     registerMember: vi.fn(),
     checkEmailExists: vi.fn(),
     logoutMember: vi.fn(),
+    getMemberClubs: vi.fn(),
+    getClubDetails: vi.fn(),
   }
 })
 
-import { loginMember, checkEmailExists, logoutMember } from './lib/api'
+import { loginMember, checkEmailExists, logoutMember, getMemberClubs, getClubDetails } from './lib/api'
 import { TOKEN_STORAGE_KEY } from './lib/jwt'
 
 const mockedLogin = vi.mocked(loginMember)
 const mockedCheckEmail = vi.mocked(checkEmailExists)
 const mockedLogout = vi.mocked(logoutMember)
+const mockedGetMemberClubs = vi.mocked(getMemberClubs)
+const mockedGetClubDetails = vi.mocked(getClubDetails)
 
 function renderApp(props?: { initialView?: 'register' | 'login' | 'lobby' | 'dashboard'; initialMember?: { memberId: string; email: string; token?: string } | null }) {
   const queryClient = new QueryClient({
@@ -41,6 +45,8 @@ describe('App navigation flows', () => {
     vi.clearAllMocks()
     window.location.hash = ''
     window.localStorage.clear()
+    mockedGetMemberClubs.mockResolvedValue([{ id: 'club-1', name: 'Leuven Robotics Club', role: 'Club Admin' }])
+    mockedGetClubDetails.mockResolvedValue({ id: 'club-1', name: 'Leuven Robotics Club', role: 'Club Admin' })
   })
 
   it('renders register view by default and navigates to login view', async () => {
@@ -292,7 +298,7 @@ describe('App navigation flows', () => {
       },
     })
 
-    expect(screen.getByTestId('club-dashboard-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('club-dashboard-page')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Back to Lobby/i })).toBeInTheDocument()
   })
 
@@ -312,10 +318,10 @@ describe('App navigation flows', () => {
       },
     })
 
-    const backBtn = screen.getByRole('button', { name: /Back to Lobby/i })
+    const backBtn = await screen.findByTestId('back-to-lobby-btn')
     await user.click(backBtn)
 
-    expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
     expect(window.location.hash).toBe('#lobby')
   })
 
