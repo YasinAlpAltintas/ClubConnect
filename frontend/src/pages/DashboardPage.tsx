@@ -26,6 +26,13 @@ export default function DashboardPage({
 }: DashboardPageProps) {
   const { t, i18n } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [selectedClubId, setSelectedClubId] = useState<string | null | undefined>(initialActiveClubId)
+
+  useEffect(() => {
+    if (initialActiveClubId !== undefined) {
+      setSelectedClubId(initialActiveClubId)
+    }
+  }, [initialActiveClubId])
 
   const {
     data: clubs = initialClubs ?? [],
@@ -43,7 +50,7 @@ export default function DashboardPage({
     initialActiveClubId,
   })
 
-  const targetClubId = initialActiveClubId || activeClubId
+  const targetClubId = selectedClubId ?? activeClubId
 
   const {
     data: clubDetails,
@@ -67,6 +74,7 @@ export default function DashboardPage({
   }, [detailsError, onSessionExpired])
 
   const handleSelectClub = (clubId: string) => {
+    setSelectedClubId(clubId)
     setActiveClubId(clubId)
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
       window.location.hash = `#dashboard/${clubId}`
@@ -74,10 +82,10 @@ export default function DashboardPage({
   }
 
   useEffect(() => {
-    if (activeClubId && typeof window !== 'undefined' && window.location.hash === '#dashboard') {
-      window.location.hash = `#dashboard/${activeClubId}`
+    if (targetClubId && typeof window !== 'undefined' && window.location.hash === '#dashboard') {
+      window.location.hash = `#dashboard/${targetClubId}`
     }
-  }, [activeClubId])
+  }, [targetClubId])
 
   function toggleLanguage() {
     const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
@@ -157,7 +165,7 @@ export default function DashboardPage({
     )
   }
 
-  const currentClub = clubDetails ?? activeClub
+  const currentClub = clubDetails ?? clubs.find((c) => c.id === targetClubId) ?? activeClub
 
   if ((isLoadingClubs || isLoadingDetails) && !currentClub) {
     return (
@@ -180,7 +188,7 @@ export default function DashboardPage({
           </span>
           <ClubSwitcherDropdown
             clubs={clubs}
-            activeClubId={activeClubId}
+            activeClubId={targetClubId}
             onSelectClub={handleSelectClub}
           />
         </div>
