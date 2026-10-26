@@ -211,4 +211,24 @@ describe('DashboardPage', () => {
       expect(handleExpired).toHaveBeenCalled()
     })
   })
+  it('switches active club via dropdown in dashboard and updates hash', async () => {
+    const user = userEvent.setup()
+    window.location.hash = '#dashboard/club-alpha'
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubAdmin, dummyClubMember],
+      initialActiveClubId: 'club-alpha',
+    })
+
+    const switcherBtn = await screen.findByRole('button', { name: /Switch club/i })
+    await user.click(switcherBtn)
+
+    const optionBeta = screen.getByRole('option', { name: /Leuven Chess Guild/i })
+    await user.click(optionBeta)
+
+    expect(window.location.hash).toBe('#dashboard/club-beta')
+  })
 })

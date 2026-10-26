@@ -333,4 +333,22 @@ describe('App navigation flows', () => {
 
     expect(screen.getByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
   })
+  it('activates specific club when navigating to #dashboard/:clubId', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    window.location.hash = '#dashboard/club-specific'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(await screen.findByTestId('club-dashboard-page')).toBeInTheDocument()
+  })
 })

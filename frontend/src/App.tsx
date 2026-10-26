@@ -134,10 +134,13 @@ export default function App({
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
-  function navigateTo(target: AppView) {
+  function navigateTo(target: AppView, detailId?: string) {
     setView(target)
     if (typeof window !== 'undefined') {
-      window.location.hash = `#${target}`
+      const targetHash = detailId ? `#${target}/${detailId}` : `#${target}`
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash
+      }
     }
   }
 
@@ -176,7 +179,7 @@ export default function App({
             navigateTo('login')
           }}
           onSessionExpired={handleExpireSession}
-          onEnterDashboard={() => navigateTo('dashboard')}
+          onEnterDashboard={(clubId) => navigateTo('dashboard', clubId)}
         />
       )
     }

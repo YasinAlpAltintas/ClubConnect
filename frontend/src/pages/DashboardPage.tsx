@@ -64,6 +64,19 @@ export default function DashboardPage({
     }
   }, [detailsError, onSessionExpired])
 
+  const handleSelectClub = (clubId: string) => {
+    setActiveClubId(clubId)
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
+      window.location.hash = `#dashboard/${clubId}`
+    }
+  }
+
+  useEffect(() => {
+    if (activeClubId && typeof window !== 'undefined' && window.location.hash === '#dashboard') {
+      window.location.hash = `#dashboard/${activeClubId}`
+    }
+  }, [activeClubId])
+
   function toggleLanguage() {
     const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
     void i18n.changeLanguage(next)
@@ -166,7 +179,7 @@ export default function DashboardPage({
           <ClubSwitcherDropdown
             clubs={clubs}
             activeClubId={activeClubId}
-            onSelectClub={setActiveClubId}
+            onSelectClub={handleSelectClub}
           />
         </div>
         <div className="flex items-center space-x-3">
