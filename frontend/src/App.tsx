@@ -119,20 +119,36 @@ export default function App({
   useEffect(() => {
     function handleHashChange() {
       const hash = window.location.hash
-      if (hash === '#login') {
-        setView('login')
-      } else if (hash === '#register') {
-        setView('register')
-      } else if (hash.startsWith('#dashboard')) {
-        setView(member ? 'dashboard' : 'login')
-      } else if (hash === '#lobby') {
-        setView('lobby')
+      const token = getStoredToken()
+      const hasValidToken = Boolean(token && !isTokenExpired(token))
+      const isAuth = Boolean(member || hasValidToken)
+
+      if (!member && hasValidToken && token) {
+        const claims = parseJwt(token)
+        if (claims?.sub && claims?.email) {
+          setMember({
+            memberId: claims.sub,
+            email: claims.email,
+            displayName: claims.name || null,
+            token,
+          })
+        }
+      }
+
+      if (hash === "#login") {
+        setView("login")
+      } else if (hash === "#register") {
+        setView("register")
+      } else if (hash.startsWith("#dashboard")) {
+        setView(isAuth ? "dashboard" : "login")
+      } else if (hash === "#lobby") {
+        setView(isAuth ? "lobby" : "login")
       }
     }
 
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [])
+    window.addEventListener("hashchange", handleHashChange)
+    return () => window.removeEventListener("hashchange", handleHashChange)
+  }, [member])
 
   function navigateTo(target: AppView, detailId?: string) {
     setView(target)
@@ -204,9 +220,15 @@ export default function App({
 
   if (view === 'dashboard') {
     if (member) {
+      const clubIdFromHash =
+        typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard/')
+          ? window.location.hash.split('/')[1]
+          : undefined
+
       return (
         <DashboardPage
           member={member}
+          initialActiveClubId={clubIdFromHash}
           onLogout={() => {
             if (member?.token) {
               void logoutMember(member.token)

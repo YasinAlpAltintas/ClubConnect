@@ -43,14 +43,16 @@ export default function DashboardPage({
     initialActiveClubId,
   })
 
+  const targetClubId = initialActiveClubId || activeClubId
+
   const {
     data: clubDetails,
     isLoading: isLoadingDetails,
     error: detailsError,
   } = useQuery({
-    queryKey: ['clubDetails', activeClubId, member.token],
-    queryFn: () => getClubDetails(activeClubId!, member.token),
-    enabled: !!activeClubId && !!member.token,
+    queryKey: ['clubDetails', targetClubId, member.token],
+    queryFn: () => getClubDetails(targetClubId!, member.token),
+    enabled: !!targetClubId && !!member.token,
     retry: false,
   })
 
@@ -91,8 +93,8 @@ export default function DashboardPage({
   }
 
   const isAccessDenied = Boolean(
-    (detailsError && ((detailsError as { status?: number }).status === 403 || (detailsError instanceof Error && detailsError.message.includes('403')))) ||
-    (!isLoadingClubs && clubs.length > 0 && activeClubId && !clubs.some((c) => c.id === activeClubId)) ||
+    (detailsError && ((detailsError as { status?: number }).status === 403 || (detailsError as { status?: number }).status === 404 || (detailsError instanceof Error && (detailsError.message.includes('403') || detailsError.message.includes('404'))))) ||
+    (!isLoadingClubs && clubs.length > 0 && targetClubId && !clubs.some((c) => c.id === targetClubId)) ||
     (!isLoadingClubs && clubs.length === 0)
   )
 

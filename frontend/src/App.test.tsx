@@ -339,7 +339,7 @@ describe('App navigation flows', () => {
     const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
     const validToken = `${header}.${payload}.sig`
 
-    window.location.hash = '#dashboard/club-specific'
+    window.location.hash = '#dashboard/club-1'
     renderApp({
       initialView: 'dashboard',
       initialMember: {
@@ -350,5 +350,23 @@ describe('App navigation flows', () => {
     })
 
     expect(await screen.findByTestId('club-dashboard-page')).toBeInTheDocument()
+  })
+  it('displays access denied when navigating to non-member club #dashboard/:clubId', async () => {
+    const header = btoa(JSON.stringify({ alg: 'HS256' })).replace(/=/g, '')
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const payload = btoa(JSON.stringify({ exp, sub: 'mem-100', email: 'dashboard-user@example.com' })).replace(/=/g, '')
+    const validToken = `${header}.${payload}.sig`
+
+    window.location.hash = '#dashboard/unknown-club'
+    renderApp({
+      initialView: 'dashboard',
+      initialMember: {
+        memberId: 'mem-100',
+        email: 'dashboard-user@example.com',
+        token: validToken,
+      },
+    })
+
+    expect(await screen.findByTestId('dashboard-access-denied')).toBeInTheDocument()
   })
 })
