@@ -81,6 +81,7 @@
     "activeWorkspaceTitle": "Actieve club werkruimte",
     "activeWorkspaceSubtitle": "Je werkt momenteel in de werkruimte van deze club.",
     "switchToClub": "Wissel naar werkruimte",
+    "enterDashboard": "Naar Dashboard",
     "currentlyActive": "Actief",
     "inviteCodeBadge": "Uitnodigingscode: {{code}}",
     "copyInviteCode": "Kopieer code",
@@ -151,5 +152,25 @@
   "success": {
     "title": "Account aangemaakt",
     "message": "Welkom bij ClubConnect, {{email}}. Je account staat klaar."
+  },
+  "dashboard": {
+    "title": "Club Dashboard",
+    "badge": "Club Werkruimte",
+    "backToLobby": "← Terug naar Lobby",
+    "accessDenied": "Toegang geweigerd",
+    "accessDeniedMessage": "Je hebt geen toegang tot deze club of je bent geen lid.",
+    "roleAdmin": "Clubbeheerder",
+    "roleMember": "Clublid",
+    "modules": {
+      "title": "Clubbeheer Modules",
+      "subtitle": "Gestroomlijnde organisatie voor je studentenvereniging.",
+      "calendarTitle": "Kalender & Evenementen",
+      "calendarDesc": "Plan clubbijeenkomsten, wedstrijden, workshops en teamvergaderingen.",
+      "tasksTitle": "Kanban-takenbord",
+      "tasksDesc": "Wijs taken toe, organiseer sprints en houd gezamenlijk de voortgang bij.",
+      "logisticsTitle": "Logistiek & Voorraad",
+      "logisticsDesc": "Beheer clubmateriaal, zaalreserveringen en fysieke uitrusting.",
+      "comingSoon": "Binnenkort beschikbaar"
+    }
   }
 }
