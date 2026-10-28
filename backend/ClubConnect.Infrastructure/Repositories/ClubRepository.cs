@@ -324,4 +324,35 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
             Role: "Club Member",
             JoinedAtUtc: membership.JoinedAtUtc);
     }
+
+    public async Task<IReadOnlyList<ClubMemberDetail>> GetMembersForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        var members = await context.Memberships
+            .AsNoTracking()
+            .Where(m => m.ClubId == clubId)
+            .OrderBy(m => m.Member!.DisplayName != null && m.Member.DisplayName != "" ? m.Member.DisplayName : m.Member!.Email)
+            .ThenBy(m => m.MemberId)
+            .Select(m => new ClubMemberDetail(
+                m.MemberId,
+                m.Member!.DisplayName ?? string.Empty,
+                m.Member.Email,
+                m.Role,
+                m.JoinedAtUtc))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return members;
+    }
+
+    public Task<bool> IsClubAdminAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        return context.Memberships
+            .AsNoTracking()
+            .AnyAsync(m => m.ClubId == clubId && m.MemberId == memberId && m.Role == "Club Admin", cancellationToken);
+    }
 }
