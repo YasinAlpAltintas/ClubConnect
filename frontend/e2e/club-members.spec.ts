@@ -83,10 +83,12 @@ test.describe('INC-15: View Club Members', () => {
   }) => {
     const adminEmail = `admin-ui-${Date.now()}@example.com`
     const memberEmail = `member-ui-${Date.now()}@example.com`
+    const adminName = 'AI Society Admin'
+    const memberName = 'Cyber Member'
     const password = 'Passw0rd123!'
 
     // 1. Register admin & create 2 clubs via API
-    await request.post('/api/auth/register', { data: { email: adminEmail, password } })
+    await request.post('/api/auth/register', { data: { email: adminEmail, password, displayName: adminName } })
     const loginAdminRes = await request.post('/api/auth/login', { data: { email: adminEmail, password } })
     const { token: adminToken } = await loginAdminRes.json()
 
@@ -103,7 +105,7 @@ test.describe('INC-15: View Club Members', () => {
     const club2 = await club2Res.json()
 
     // 2. Register member and join Club 1
-    await request.post('/api/auth/register', { data: { email: memberEmail, password } })
+    await request.post('/api/auth/register', { data: { email: memberEmail, password, displayName: memberName } })
     const loginMemberRes = await request.post('/api/auth/login', { data: { email: memberEmail, password } })
     const { token: memberToken } = await loginMemberRes.json()
 
@@ -136,8 +138,10 @@ test.describe('INC-15: View Club Members', () => {
     await expect(page.getByTestId('club-members-table')).toBeVisible()
 
     // Verify 2 members are listed (Admin and joined Member)
-    await expect(page.getByText(adminEmail)).toBeVisible()
-    await expect(page.getByText(memberEmail)).toBeVisible()
+    await expect(page.getByText(adminName)).toBeVisible()
+    await expect(page.locator('[data-testid^="member-email-"]', { hasText: adminEmail })).toBeVisible()
+    await expect(page.getByText(memberName)).toBeVisible()
+    await expect(page.locator('[data-testid^="member-email-"]', { hasText: memberEmail })).toBeVisible()
 
     const adminRoleBadge = page.getByText(/Club Admin|Clubbeheerder/i)
     await expect(adminRoleBadge.first()).toBeVisible()
@@ -157,9 +161,11 @@ test.describe('INC-15: View Club Members', () => {
     await expect(page.getByTestId('members-page-heading')).toHaveText(/Club Members|Clubleden/i)
     await expect(page.getByText(/Leuven Cyber Security/)).toBeVisible()
 
-    // In Club 2: Admin is present, but memberEmail is NOT a member of Club 2!
-    await expect(page.getByText(adminEmail)).toBeVisible()
-    await expect(page.getByText(memberEmail)).not.toBeVisible()
+    // In Club 2: Admin is present, but memberName/memberEmail is NOT a member of Club 2!
+    await expect(page.getByText(adminName)).toBeVisible()
+    await expect(page.locator('[data-testid^="member-email-"]', { hasText: adminEmail })).toBeVisible()
+    await expect(page.getByText(memberName)).not.toBeVisible()
+    await expect(page.locator('[data-testid^="member-email-"]', { hasText: memberEmail })).not.toBeVisible()
 
     // 8. Return to Dashboard Overview via Back button
     const backToDashLink = page.getByTestId('back-to-dashboard-link')
