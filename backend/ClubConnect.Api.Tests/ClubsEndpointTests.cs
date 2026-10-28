@@ -518,4 +518,172 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
         Assert.Equal("Club Member", detail.GetProperty("role").GetString());
         Assert.True(detail.GetProperty("inviteCode").ValueKind == JsonValueKind.Null);
     }
+
+    [Fact]
+    public async Task GetClubMembers_WithoutToken_Returns401Unauthorized()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{Guid.NewGuid()}/members");
+        using var response = await _fixture.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubMembers_WithExpiredToken_Returns401Unauthorized()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var expiredToken = jwtService.GenerateToken(new Domain.Entities.Member
+        {
+            Id = Guid.NewGuid(),
+            Email = "expired-member@example.com",
+            DisplayName = "Expired"
+        }, TimeSpan.FromSeconds(-30));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{Guid.NewGuid()}/members");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", expiredToken);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubMembers_WhenClubDoesNotExist_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("admin-notfound");
+        var nonExistentClubId = Guid.NewGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{nonExistentClubId}/members");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("not_found", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubMembers_WhenUserIsOrdinaryMember_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("admin-owner");
+        var memberToken = await RegisterAndLoginAsync("normal-member");
+
+        // 1. Admin creates club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Robotics Lab" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Normal member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Normal member tries to access members overview
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/members");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, getRes.StatusCode);
+        var body = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("forbidden", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubMembers_WhenUserIsAdminOfDifferentClub_Returns403Forbidden()
+    {
+        var adminAToken = await RegisterAndLoginAsync("admin-a");
+        var adminBToken = await RegisterAndLoginAsync("admin-b");
+
+        // 1. Admin A creates Club A
+        using var createReqA = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Club Alpha" })
+        };
+        createReqA.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminAToken);
+        using var createResA = await _fixture.Client.SendAsync(createReqA);
+        var createdA = await createResA.Content.ReadFromJsonAsync<JsonElement>();
+        var clubAId = createdA.GetProperty("id").GetString();
+
+        // 2. Admin B creates Club B
+        using var createReqB = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Club Beta" })
+        };
+        createReqB.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminBToken);
+        using var createResB = await _fixture.Client.SendAsync(createReqB);
+        Assert.Equal(HttpStatusCode.Created, createResB.StatusCode);
+
+        // 3. Admin B attempts to access Club A's members
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubAId}/members");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminBToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, getRes.StatusCode);
+        var body = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("forbidden", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetClubMembers_WhenUserIsAdmin_Returns200OK_WithMembersList()
+    {
+        var adminToken = await RegisterAndLoginAsync("admin-full");
+        var member1Token = await RegisterAndLoginAsync("joined-alice");
+        var member2Token = await RegisterAndLoginAsync("joined-bob");
+
+        // 1. Admin creates club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "AI Research Group", description = "Machine learning research club" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Members join club
+        using var joinReq1 = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq1.Headers.Authorization = new AuthenticationHeaderValue("Bearer", member1Token);
+        var joinRes1 = await _fixture.Client.SendAsync(joinReq1);
+        Assert.Equal(HttpStatusCode.OK, joinRes1.StatusCode);
+
+        using var joinReq2 = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq2.Headers.Authorization = new AuthenticationHeaderValue("Bearer", member2Token);
+        var joinRes2 = await _fixture.Client.SendAsync(joinReq2);
+        Assert.Equal(HttpStatusCode.OK, joinRes2.StatusCode);
+
+        // 3. Admin retrieves members
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/members");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var members = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Array, members.ValueKind);
+        Assert.Equal(3, members.GetArrayLength());
+
+        var adminMember = members.EnumerateArray().FirstOrDefault(m => m.GetProperty("role").GetString() == "Club Admin");
+        Assert.True(adminMember.ValueKind == JsonValueKind.Object);
+        Assert.Equal("Club Admin", adminMember.GetProperty("role").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(adminMember.GetProperty("email").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(adminMember.GetProperty("memberId").GetString()));
+
+        var regularMembers = members.EnumerateArray().Where(m => m.GetProperty("role").GetString() == "Club Member").ToList();
+        Assert.Equal(2, regularMembers.Count);
+    }
 }

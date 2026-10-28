@@ -297,4 +297,58 @@ public class ClubRepositoryTests : IDisposable
         Assert.Equal("Club Member", result.Role);
         Assert.Null(result.InviteCode); // Non-admins must not see invite code
     }
+
+    [Fact]
+    public async Task GetMembersForClubAsync_ReturnsMembersOrderedByDisplayNameAndEmail()
+    {
+        var admin = await SeedMemberAsync("zeta@example.com");
+        admin.DisplayName = "Zeta Admin";
+        await _context.SaveChangesAsync();
+
+        var joinerB = await SeedMemberAsync("alpha@example.com");
+        joinerB.DisplayName = "Alpha User";
+        await _context.SaveChangesAsync();
+
+        var joinerNoName = await SeedMemberAsync("beta@example.com");
+        joinerNoName.DisplayName = "";
+        await _context.SaveChangesAsync();
+
+        var repository = NewRepository();
+        var club = await repository.CreateClubWithAdminAsync("Multi Member Club", "Description", admin.Id, CancellationToken.None);
+        var invite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+
+        await repository.JoinClubByInviteCodeAsync(invite.Code, joinerB.Id, CancellationToken.None);
+        await repository.JoinClubByInviteCodeAsync(invite.Code, joinerNoName.Id, CancellationToken.None);
+
+        var members = await repository.GetMembersForClubAsync(club.Id, CancellationToken.None);
+
+        Assert.Equal(3, members.Count);
+        Assert.Equal("Alpha User", members[0].DisplayName);
+        Assert.Equal("Club Member", members[0].Role);
+
+        Assert.Equal(string.Empty, members[1].DisplayName);
+        Assert.Equal("beta@example.com", members[1].Email);
+        Assert.Equal("Club Member", members[1].Role);
+
+        Assert.Equal("Zeta Admin", members[2].DisplayName);
+        Assert.Equal("Club Admin", members[2].Role);
+    }
+
+    [Fact]
+    public async Task IsClubAdminAsync_IdentifiesAdminCorrectly()
+    {
+        var admin = await SeedMemberAsync("admin-check@example.com");
+        var joiner = await SeedMemberAsync("joiner-check@example.com");
+        var outsider = await SeedMemberAsync("outsider-check@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("Admin Check Club", "Description", admin.Id, CancellationToken.None);
+        var invite = await _context.ClubInvites.SingleAsync(i => i.ClubId == club.Id);
+        await repository.JoinClubByInviteCodeAsync(invite.Code, joiner.Id, CancellationToken.None);
+
+        Assert.True(await repository.IsClubAdminAsync(club.Id, admin.Id, CancellationToken.None));
+        Assert.False(await repository.IsClubAdminAsync(club.Id, joiner.Id, CancellationToken.None));
+        Assert.False(await repository.IsClubAdminAsync(club.Id, outsider.Id, CancellationToken.None));
+        Assert.False(await repository.IsClubAdminAsync(Guid.NewGuid(), admin.Id, CancellationToken.None));
+    }
 }
