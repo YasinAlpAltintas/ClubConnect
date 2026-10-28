@@ -172,5 +172,26 @@
       "logisticsDesc": "Manage club assets, venue reservations, and physical equipment.",
       "comingSoon": "Coming Soon"
     }
+  },
+  "members": {
+    "title": "Club Members",
+    "subtitle": "Active members belonging to {{clubName}}.",
+    "backToDashboard": "Back to Dashboard",
+    "navButton": "Members",
+    "memberCount_one": "1 member",
+    "memberCount_other": "{{count}} members",
+    "memberCount": "{{count}} members",
+    "tableCaption": "Current club members",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "joined": "Joined"
+    },
+    "emptyTitle": "No members yet",
+    "emptyDesc": "No active members were found in this club workspace.",
+    "errorTitle": "Unable to load members",
+    "errorMessage": "Failed to retrieve member list for this club.",
+    "accessDeniedMessage": "You do not have administrative access to view this club's members."
   }
 }
