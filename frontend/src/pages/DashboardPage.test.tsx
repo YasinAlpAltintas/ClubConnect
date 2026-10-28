@@ -11,6 +11,7 @@ vi.mock('../lib/api', async () => {
     ...actual,
     getMemberClubs: vi.fn(),
     getClubDetails: vi.fn(),
+    getClubMembers: vi.fn(),
   }
 })
 
@@ -211,6 +212,7 @@ describe('DashboardPage', () => {
       expect(handleExpired).toHaveBeenCalled()
     })
   })
+
   it('switches active club via dropdown in dashboard and updates hash', async () => {
     const user = userEvent.setup()
     window.location.hash = '#dashboard/club-alpha'
@@ -230,5 +232,86 @@ describe('DashboardPage', () => {
     await user.click(optionBeta)
 
     expect(window.location.hash).toBe('#dashboard/club-beta')
+  })
+
+  it('shows Members button for Club Admin and hides it for Club Member', async () => {
+    // 1. Club Admin renders with Members button
+    const { unmount } = renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubAdmin],
+      initialActiveClubId: 'club-alpha',
+    })
+
+    expect(await screen.findByTestId('dashboard-members-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-members-nav-btn')).toBeInTheDocument()
+    unmount()
+
+    // 2. Club Member renders WITHOUT Members button
+    vi.mocked(api.getClubDetails).mockResolvedValue(dummyClubMember)
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubMember],
+      initialActiveClubId: 'club-beta',
+    })
+
+    expect(await screen.findByTestId('dashboard-club-name')).toHaveTextContent('Leuven Chess Guild')
+    expect(screen.queryByTestId('dashboard-members-btn')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('dashboard-members-nav-btn')).not.toBeInTheDocument()
+  })
+
+  it('navigates to members view when clicking Members button and displays table', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getClubMembers).mockResolvedValue([
+      {
+        memberId: 'm-1',
+        displayName: 'Alice Lead',
+        email: 'alice@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-01T00:00:00Z',
+      },
+    ])
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubAdmin],
+      initialActiveClubId: 'club-alpha',
+    })
+
+    const membersBtn = await screen.findByTestId('dashboard-members-btn')
+    await user.click(membersBtn)
+
+    expect(await screen.findByTestId('members-page-heading')).toHaveTextContent(/Club Members|Clubleden/i)
+    expect(screen.getByTestId('club-members-table')).toBeInTheDocument()
+    expect(screen.getByTestId('member-name-m-1')).toHaveTextContent('Alice Lead')
+    expect(window.location.hash).toBe('#dashboard/club-alpha/members')
+
+    // Navigate back to dashboard overview
+    const backBtn = screen.getByTestId('back-to-dashboard-link')
+    await user.click(backBtn)
+
+    expect(await screen.findByTestId('dashboard-club-name')).toHaveTextContent('Leuven Robotics Club')
+    expect(window.location.hash).toBe('#dashboard/club-alpha')
+  })
+
+  it('displays access denied when non-admin navigates directly to members view', async () => {
+    window.location.hash = '#dashboard/club-beta/members'
+    vi.mocked(api.getClubDetails).mockResolvedValue(dummyClubMember)
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubMember],
+      initialActiveClubId: 'club-beta',
+    })
+
+    expect(await screen.findByTestId('dashboard-access-denied')).toBeInTheDocument()
+    expect(screen.getByText(/You do not have administrative access|Je hebt geen beheerdersrechten/i)).toBeInTheDocument()
   })
 })
