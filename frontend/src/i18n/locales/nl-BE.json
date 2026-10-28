@@ -172,5 +172,26 @@
       "logisticsDesc": "Beheer clubmateriaal, zaalreserveringen en fysieke uitrusting.",
       "comingSoon": "Binnenkort beschikbaar"
     }
+  },
+  "members": {
+    "title": "Clubleden",
+    "subtitle": "Actieve leden van {{clubName}}.",
+    "backToDashboard": "Terug naar dashboard",
+    "navButton": "Leden",
+    "memberCount_one": "1 lid",
+    "memberCount_other": "{{count}} leden",
+    "memberCount": "{{count}} leden",
+    "tableCaption": "Huidige clubleden",
+    "columns": {
+      "name": "Naam",
+      "email": "E-mailadres",
+      "role": "Rol",
+      "joined": "Lid sinds"
+    },
+    "emptyTitle": "Nog geen leden",
+    "emptyDesc": "Er zijn geen actieve leden gevonden in deze clubwerkruimte.",
+    "errorTitle": "Kan leden niet laden",
+    "errorMessage": "Ophalen van de ledenlijst voor deze club is mislukt.",
+    "accessDeniedMessage": "Je hebt geen beheerdersrechten om de leden van deze club te bekijken."
   }
 }

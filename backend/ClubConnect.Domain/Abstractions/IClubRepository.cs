@@ -38,6 +38,16 @@ public sealed record ClubMembershipSummary(
     string? InviteCode = null);
 
 /// <summary>
+/// Detailed representation of a member in a club workspace for administration overviews.
+/// </summary>
+public sealed record ClubMemberDetail(
+    Guid MemberId,
+    string DisplayName,
+    string Email,
+    string Role,
+    DateTimeOffset JoinedAtUtc);
+
+/// <summary>
 /// Persistence operations for <see cref="Club"/> and its associated memberships and invite codes.
 /// </summary>
 public interface IClubRepository
@@ -97,6 +107,21 @@ public interface IClubRepository
     /// </summary>
     Task<JoinClubResult> JoinClubByInviteCodeAsync(
         string code,
+        Guid memberId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves all members belonging to the specified club, ordered deterministically by display name or email.
+    /// </summary>
+    Task<IReadOnlyList<ClubMemberDetail>> GetMembersForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Checks if the specified member has the "Club Admin" role in the specified club workspace.
+    /// </summary>
+    Task<bool> IsClubAdminAsync(
+        Guid clubId,
         Guid memberId,
         CancellationToken cancellationToken);
 }

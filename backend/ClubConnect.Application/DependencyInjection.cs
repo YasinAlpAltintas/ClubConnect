@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<LoginMemberUseCase>();
         services.AddScoped<CreateClubUseCase>();
         services.AddScoped<JoinClubUseCase>();
+        services.AddScoped<GetClubMembersUseCase>();
         return services;
     }
 }
