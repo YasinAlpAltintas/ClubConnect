@@ -16,7 +16,8 @@ public class ClubsController(
     CreateClubUseCase createClubUseCase,
     JoinClubUseCase joinClubUseCase,
     IJwtTokenService? jwtTokenService = null,
-    IClubRepository? clubRepository = null) : ControllerBase
+    IClubRepository? clubRepository = null,
+    GetClubMembersUseCase? getClubMembersUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -247,5 +248,72 @@ public class ClubsController(
         }
 
         return Ok(summary);
+    }
+
+    /// <summary>Response item for <c>GET /api/clubs/{id}/members</c>.</summary>
+    public sealed record ClubMemberResponse(
+        Guid MemberId,
+        string DisplayName,
+        string Email,
+        string Role,
+        DateTimeOffset JoinedAtUtc);
+
+    /// <summary>
+    /// Retrieves all members of the specified club workspace.
+    /// Enforces strict admin authorization and tenant isolation:
+    /// 200 → members list · 401 → unauthenticated · 403 → forbidden (not a Club Admin of this club) · 404 → club not found.
+    /// </summary>
+    [HttpGet("{id:guid}/members")]
+    [ProducesResponseType(typeof(IEnumerable<ClubMemberResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClubMembers([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (getClubMembersUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Member retrieval service is unavailable." });
+        }
+
+        var query = new GetClubMembersQuery
+        {
+            ClubId = id,
+            RequestingMemberId = validation.MemberId.Value
+        };
+
+        var outcome = await getClubMembersUseCase.ExecuteAsync(query, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            GetClubMembersStatus.Success => Ok(outcome.Members.Select(m => new ClubMemberResponse(
+                m.MemberId,
+                m.DisplayName,
+                m.Email,
+                m.Role,
+                m.JoinedAtUtc))),
+            GetClubMembersStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            GetClubMembersStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            GetClubMembersStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
+        };
     }
 }
