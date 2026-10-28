@@ -355,7 +355,10 @@ export default function DashboardPage({
                 )}
               </div>
               {currentClub && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <p
+                  data-testid="members-page-subtitle"
+                  className="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                >
                   {t('members.subtitle', { clubName: currentClub.name })}
                 </p>
               )}

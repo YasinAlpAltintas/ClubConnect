@@ -159,7 +159,8 @@ test.describe('INC-15: View Club Members', () => {
 
     // URL and table update to Club 2
     await expect(page.getByTestId('members-page-heading')).toHaveText(/Club Members|Clubleden/i)
-    await expect(page.getByText(/Leuven Cyber Security/)).toBeVisible()
+    await expect(page.getByTestId('members-page-subtitle')).toContainText('Leuven Cyber Security')
+    await expect(page.getByTestId('club-switcher-trigger')).toContainText('Leuven Cyber Security')
 
     // In Club 2: Admin is present, but memberName/memberEmail is NOT a member of Club 2!
     await expect(page.getByText(adminName)).toBeVisible()
