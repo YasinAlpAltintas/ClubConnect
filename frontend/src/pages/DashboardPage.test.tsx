@@ -287,6 +287,8 @@ describe('DashboardPage', () => {
     await user.click(membersBtn)
 
     expect(await screen.findByTestId('members-page-heading')).toHaveTextContent(/Club Members|Clubleden/i)
+    expect(screen.getByTestId('members-invite-code-card')).toBeInTheDocument()
+    expect(screen.getByTestId('invite-code-value')).toHaveTextContent('048291')
     expect(screen.getByTestId('club-members-table')).toBeInTheDocument()
     expect(screen.getByTestId('member-name-m-1')).toHaveTextContent('Alice Lead')
     expect(window.location.hash).toBe('#dashboard/club-alpha/members')
