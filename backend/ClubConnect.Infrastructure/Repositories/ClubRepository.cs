@@ -395,4 +395,32 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
 
         return membership;
     }
+
+    public async Task<bool> RemoveMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        var membership = await context.Memberships
+            .FirstOrDefaultAsync(m => m.ClubId == clubId && m.MemberId == memberId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            return false;
+        }
+
+        context.Memberships.Remove(membership);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public Task<int> GetAdminCountForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        return context.Memberships
+            .AsNoTracking()
+            .CountAsync(m => m.ClubId == clubId && m.Role == "Club Admin", cancellationToken);
+    }
 }

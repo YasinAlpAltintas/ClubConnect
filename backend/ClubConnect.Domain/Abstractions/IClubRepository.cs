@@ -143,4 +143,20 @@ public interface IClubRepository
         Guid clubId,
         Guid memberId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes a member from a club workspace, revoking all membership privileges.
+    /// Returns <c>true</c> if the membership was found and removed, otherwise <c>false</c>.
+    /// </summary>
+    Task<bool> RemoveMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the number of active Club Admins in the specified club workspace.
+    /// </summary>
+    Task<int> GetAdminCountForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken);
 }
