@@ -18,7 +18,8 @@ public class ClubsController(
     IJwtTokenService? jwtTokenService = null,
     IClubRepository? clubRepository = null,
     GetClubMembersUseCase? getClubMembersUseCase = null,
-    UpdateMemberRoleUseCase? updateMemberRoleUseCase = null) : ControllerBase
+    UpdateMemberRoleUseCase? updateMemberRoleUseCase = null,
+    RemoveClubMemberUseCase? removeClubMemberUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -385,6 +386,65 @@ public class ClubsController(
             UpdateMemberRoleStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
             UpdateMemberRoleStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "update_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>
+    /// Removes a member from the club workspace, immediately revoking their access to the club and its data.
+    /// Requires the authenticated user to be a "Club Admin" of the specified club.
+    /// 204 → member removed · 400 → invalid input or cannot remove sole admin · 401 → unauthenticated · 403 → forbidden · 404 → not found.
+    /// </summary>
+    [HttpDelete("{id:guid}/members/{memberId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveMember(
+        [FromRoute] Guid id,
+        [FromRoute] Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (removeClubMemberUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Member removal service is unavailable." });
+        }
+
+        var command = new RemoveClubMemberCommand
+        {
+            ClubId = id,
+            RequestingMemberId = validation.MemberId.Value,
+            TargetMemberId = memberId
+        };
+
+        var outcome = await removeClubMemberUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            RemoveClubMemberStatus.Success => NoContent(),
+            RemoveClubMemberStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            RemoveClubMemberStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            RemoveClubMemberStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "removal_failed", detail = outcome.Violation })
         };
     }
 }
