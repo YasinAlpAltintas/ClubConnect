@@ -196,7 +196,18 @@
       "promoting": "Promoting…",
       "promoteAria": "Promote {{name}} to Club Admin",
       "promoteSuccess": "Successfully promoted {{name}} to Club Admin.",
-      "promoteError": "Failed to promote member to Club Admin."
+      "promoteError": "Failed to promote member to Club Admin.",
+      "remove": "Remove",
+      "removing": "Removing…",
+      "removeAria": "Remove {{name}} from club",
+      "confirmRemove": "Remove Member",
+      "removeSuccess": "Member removed successfully.",
+      "removeError": "Failed to remove member.",
+      "you": "You"
+    },
+    "removeModal": {
+      "title": "Remove Member",
+      "description": "Are you sure you want to remove {{name}} from this club? They will immediately lose access to all club data and dashboards."
     },
     "emptyTitle": "No members yet",
     "emptyDesc": "No active members were found in this club workspace.",
