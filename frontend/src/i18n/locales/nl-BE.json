@@ -188,7 +188,15 @@
       "name": "Naam",
       "email": "E-mailadres",
       "role": "Rol",
-      "joined": "Lid sinds"
+      "joined": "Lid sinds",
+      "actions": "Acties"
+    },
+    "actions": {
+      "promote": "Beheerder maken",
+      "promoting": "Promoveren…",
+      "promoteAria": "Promoveer {{name}} tot clubbeheerder",
+      "promoteSuccess": "{{name}} is succesvol gepromoveerd tot clubbeheerder.",
+      "promoteError": "Promoveren van lid tot clubbeheerder is mislukt."
     },
     "emptyTitle": "Nog geen leden",
     "emptyDesc": "Er zijn geen actieve leden gevonden in deze clubwerkruimte.",
