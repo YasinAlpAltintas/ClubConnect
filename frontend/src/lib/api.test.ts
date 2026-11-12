@@ -733,6 +733,7 @@ describe('updateMemberRole', () => {
     }
 
     const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      expect(url).toBe('/api/clubs/c-1/members/m-2/role')
       expect(init?.method).toBe('PATCH')
       expect(init?.body).toBe(JSON.stringify({ role: 'Club Admin' }))
       return jsonResponse(mockUpdated, 200)
