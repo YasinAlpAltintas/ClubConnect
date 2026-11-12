@@ -359,6 +359,27 @@ export async function updateMemberRole(
   return (await res.json()) as ClubMemberDto
 }
 
+export async function removeClubMember(
+  clubId: string,
+  memberId: string,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetchFn(`/api/clubs/${clubId}/members/${memberId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const error = new Error(`Failed to remove club member (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string

@@ -196,7 +196,18 @@
       "promoting": "Promoveren…",
       "promoteAria": "Promoveer {{name}} tot clubbeheerder",
       "promoteSuccess": "{{name}} is succesvol gepromoveerd tot clubbeheerder.",
-      "promoteError": "Promoveren van lid tot clubbeheerder is mislukt."
+      "promoteError": "Promoveren van lid tot clubbeheerder is mislukt.",
+      "remove": "Verwijderen",
+      "removing": "Verwijderen…",
+      "removeAria": "{{name}} verwijderen uit club",
+      "confirmRemove": "Lid verwijderen",
+      "removeSuccess": "Lid is succesvol verwijderd.",
+      "removeError": "Verwijderen van lid is mislukt.",
+      "you": "Jij"
+    },
+    "removeModal": {
+      "title": "Lid verwijderen",
+      "description": "Weet je zeker dat je {{name}} wilt verwijderen uit deze club? De toegang tot alle clubgegevens en dashboards wordt direct ingetrokken."
     },
     "emptyTitle": "Nog geen leden",
     "emptyDesc": "Er zijn geen actieve leden gevonden in deze clubwerkruimte.",

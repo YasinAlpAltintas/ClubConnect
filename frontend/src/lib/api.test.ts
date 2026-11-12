@@ -17,6 +17,7 @@ import {
   JoinClubApiException,
   getClubMembers,
   updateMemberRole,
+  removeClubMember,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -757,6 +758,54 @@ describe('updateMemberRole', () => {
 
     await expect(updateMemberRole('c-1', 'm-99', 'Club Admin', 'token', fetchFn)).rejects.toMatchObject({
       message: 'Failed to update member role (404)',
+      status: 404,
+    })
+  })
+})
+
+describe('removeClubMember', () => {
+  it('sends DELETE request with authorization header and succeeds on 204', async () => {
+    let capturedUrl = ''
+    let capturedMethod = ''
+    let capturedHeaders: Record<string, string> = {}
+
+    const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      capturedUrl = String(url)
+      capturedMethod = init?.method ?? ''
+      capturedHeaders = (init?.headers as Record<string, string>) ?? {}
+      return new Response(null, { status: 204 })
+    }) as typeof fetch
+
+    await expect(removeClubMember('club-123', 'member-456', 'auth-token-xyz', fetchFn)).resolves.toBeUndefined()
+
+    expect(capturedUrl).toBe('/api/clubs/club-123/members/member-456')
+    expect(capturedMethod).toBe('DELETE')
+    expect(capturedHeaders['Authorization']).toBe('Bearer auth-token-xyz')
+  })
+
+  it('throws error with status 400 on bad request (e.g. self-removal or sole admin)', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'Cannot remove sole admin' }, 400)) as typeof fetch
+
+    await expect(removeClubMember('club-123', 'member-456', 'token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to remove club member (400)',
+      status: 400,
+    })
+  })
+
+  it('throws error with status 403 when requesting user is not a club admin', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'Forbidden' }, 403)) as typeof fetch
+
+    await expect(removeClubMember('club-123', 'member-456', 'token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to remove club member (403)',
+      status: 403,
+    })
+  })
+
+  it('throws error with status 404 when target member or club does not exist', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'Not found' }, 404)) as typeof fetch
+
+    await expect(removeClubMember('club-123', 'member-missing', 'token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to remove club member (404)',
       status: 404,
     })
   })
