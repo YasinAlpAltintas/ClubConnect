@@ -6,6 +6,7 @@ import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers } from '..
 import { useActiveClub } from '../lib/useActiveClub'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ClubMembersTable from '../components/ClubMembersTable'
+import InviteCodeCard from '../components/InviteCodeCard'
 import ThemeToggle from '../components/ThemeToggle'
 import { type SupportedLanguage } from '../i18n'
 
@@ -27,7 +28,6 @@ export default function DashboardPage({
   initialClubs,
 }: DashboardPageProps) {
   const { t, i18n } = useTranslation()
-  const [copied, setCopied] = useState(false)
   const [selectedClubId, setSelectedClubId] = useState<string | null | undefined>(initialActiveClubId)
 
   const getSubViewFromHash = (): 'overview' | 'members' => {
@@ -151,14 +151,6 @@ export default function DashboardPage({
   function toggleLanguage() {
     const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
     void i18n.changeLanguage(next)
-  }
-
-  function handleCopyInviteCode(code: string) {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
   }
 
   const isGeneralAccessDenied = Boolean(
@@ -368,6 +360,17 @@ export default function DashboardPage({
             </div>
           </div>
 
+          {currentClub && isClubAdmin && currentClub.inviteCode && (
+            <div className="mb-6">
+              <InviteCodeCard
+                code={currentClub.inviteCode}
+                clubName={currentClub.name}
+                role={currentClub.role}
+                variant="members"
+              />
+            </div>
+          )}
+
           <ClubMembersTable
             members={clubMembers}
             isLoading={isLoadingMembers}
@@ -435,22 +438,12 @@ export default function DashboardPage({
               </div>
 
               {currentClub.role === 'Club Admin' && currentClub.inviteCode && (
-                <div
-                  data-testid="dashboard-invite-code-section"
-                  className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-aurora-elevated p-3 text-xs ring-1 ring-aurora-border"
-                >
-                  <span className="font-medium text-aurora-text-secondary">
-                    {t('lobby.inviteCodeBadge', { code: currentClub.inviteCode })}
-                  </span>
-                  <button
-                    type="button"
-                    data-testid="dashboard-copy-invite-code"
-                    onClick={() => handleCopyInviteCode(currentClub.inviteCode!)}
-                    className="btn-tactile rounded-lg bg-aurora-surface px-3 py-1.5 font-semibold text-aurora-text shadow-xs ring-1 ring-aurora-border hover:bg-aurora-elevated cursor-pointer transition-colors"
-                  >
-                    {copied ? t('lobby.inviteCodeCopied') : t('lobby.copyInviteCode')}
-                  </button>
-                </div>
+                <InviteCodeCard
+                  code={currentClub.inviteCode}
+                  clubName={currentClub.name}
+                  role={currentClub.role}
+                  variant="overview"
+                />
               )}
             </section>
           )}
