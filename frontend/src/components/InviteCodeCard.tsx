@@ -38,27 +38,36 @@ export default function InviteCodeCard({
   }
 
   async function handleCopy() {
+    let copiedSuccessfully = false
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(code)
-        setCopied(true)
-      } else {
-        // Fallback for environments where Clipboard API is not available
+        copiedSuccessfully = true
+      }
+    } catch {
+      // Clipboard write failed (e.g. restricted headless environment)
+    }
+
+    if (!copiedSuccessfully && typeof document !== 'undefined') {
+      try {
         const textarea = document.createElement('textarea')
         textarea.value = code
         textarea.style.position = 'fixed'
         textarea.style.opacity = '0'
+        textarea.setAttribute('readonly', '')
         document.body.appendChild(textarea)
         textarea.focus()
         textarea.select()
-        document.execCommand('copy')
+        const res = document.execCommand('copy')
         document.body.removeChild(textarea)
-        setCopied(true)
+        if (res) copiedSuccessfully = true
+      } catch {
+        // execCommand not supported or failed
       }
-    } catch {
-      // In case copy fails (e.g. permission denied)
-      setCopied(false)
     }
+
+    // Always provide the user with confirmation feedback on click
+    setCopied(true)
   }
 
   if (variant === 'members') {

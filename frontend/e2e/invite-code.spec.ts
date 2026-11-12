@@ -54,8 +54,10 @@ test.describe('INC-16: View and Share Club Invite Code', () => {
 
   test('Club Admin views and copies 6-digit invite code in dashboard overview and members view; hidden for regular members', async ({
     page,
+    context,
     request,
   }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
     const adminEmail = `inc16-ui-admin-${Date.now()}@example.com`
     const memberEmail = `inc16-ui-member-${Date.now()}@example.com`
     const password = 'Passw0rd123!'
