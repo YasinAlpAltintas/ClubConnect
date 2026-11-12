@@ -5,7 +5,9 @@
   },
   "header": {
     "language": "Language",
-    "languageToggle": "Nederlands"
+    "languageToggle": "Nederlands",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "clubSwitcher": {
     "label": "Switch club",

@@ -5,7 +5,9 @@
   },
   "header": {
     "language": "Taal",
-    "languageToggle": "English"
+    "languageToggle": "English",
+    "themeLight": "Licht",
+    "themeDark": "Donker"
   },
   "clubSwitcher": {
     "label": "Wissel van club",
