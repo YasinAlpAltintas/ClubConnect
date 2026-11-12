@@ -17,7 +17,8 @@ public class ClubsController(
     JoinClubUseCase joinClubUseCase,
     IJwtTokenService? jwtTokenService = null,
     IClubRepository? clubRepository = null,
-    GetClubMembersUseCase? getClubMembersUseCase = null) : ControllerBase
+    GetClubMembersUseCase? getClubMembersUseCase = null,
+    UpdateMemberRoleUseCase? updateMemberRoleUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -314,6 +315,76 @@ public class ClubsController(
             GetClubMembersStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             GetClubMembersStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>Request body for <c>PATCH /api/clubs/{id}/members/{memberId}/role</c>.</summary>
+    public sealed record UpdateMemberRoleRequest(
+        [property: JsonPropertyName("role")] string? Role);
+
+    /// <summary>
+    /// Updates the role of a club member (e.g. promoting a "Club Member" to "Club Admin").
+    /// Requires the authenticated user to be a "Club Admin" of the specified club.
+    /// 200 → role updated · 400 → invalid input · 401 → unauthenticated · 403 → forbidden · 404 → not found.
+    /// </summary>
+    [HttpPatch("{id:guid}/members/{memberId:guid}/role")]
+    [ProducesResponseType(typeof(ClubMemberResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMemberRole(
+        [FromRoute] Guid id,
+        [FromRoute] Guid memberId,
+        [FromBody] UpdateMemberRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (updateMemberRoleUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Member role management service is unavailable." });
+        }
+
+        var command = new UpdateMemberRoleCommand
+        {
+            ClubId = id,
+            RequestingMemberId = validation.MemberId.Value,
+            TargetMemberId = memberId,
+            Role = request?.Role ?? string.Empty
+        };
+
+        var outcome = await updateMemberRoleUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            UpdateMemberRoleStatus.Success => Ok(new ClubMemberResponse(
+                outcome.Member!.MemberId,
+                outcome.Member.DisplayName,
+                outcome.Member.Email,
+                outcome.Member.Role,
+                outcome.Member.JoinedAtUtc)),
+            UpdateMemberRoleStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            UpdateMemberRoleStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            UpdateMemberRoleStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "update_failed", detail = outcome.Violation })
         };
     }
 }

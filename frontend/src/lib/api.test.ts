@@ -16,6 +16,7 @@ import {
   joinClub,
   JoinClubApiException,
   getClubMembers,
+  updateMemberRole,
 } from './api'
 import { loginApiErrorToKey } from './mapApiError'
 
@@ -717,6 +718,46 @@ describe('getClubMembers', () => {
     await expect(getClubMembers('club-1', undefined, fetchFn)).rejects.toMatchObject({
       message: 'Failed to fetch club members (401)',
       status: 401,
+    })
+  })
+})
+
+describe('updateMemberRole', () => {
+  it('updates member role and returns updated member on 200', async () => {
+    const mockUpdated = {
+      memberId: 'm-2',
+      displayName: 'Bob',
+      email: 'bob@example.com',
+      role: 'Club Admin',
+      joinedAtUtc: '2026-02-01T00:00:00Z',
+    }
+
+    const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      expect(url).toBe('/api/clubs/c-1/members/m-2/role')
+      expect(init?.method).toBe('PATCH')
+      expect(init?.body).toBe(JSON.stringify({ role: 'Club Admin' }))
+      return jsonResponse(mockUpdated, 200)
+    }) as typeof fetch
+
+    const result = await updateMemberRole('c-1', 'm-2', 'Club Admin', 'test-token', fetchFn)
+    expect(result).toEqual(mockUpdated)
+  })
+
+  it('throws error with status on 403 forbidden', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'forbidden' }, 403)) as typeof fetch
+
+    await expect(updateMemberRole('c-1', 'm-2', 'Club Admin', 'token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to update member role (403)',
+      status: 403,
+    })
+  })
+
+  it('throws error with status on 404 not found', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'not_found' }, 404)) as typeof fetch
+
+    await expect(updateMemberRole('c-1', 'm-99', 'Club Admin', 'token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to update member role (404)',
+      status: 404,
     })
   })
 })

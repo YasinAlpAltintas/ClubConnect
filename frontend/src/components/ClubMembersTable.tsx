@@ -7,6 +7,9 @@ export interface ClubMembersTableProps {
   isError?: boolean
   errorMessage?: string
   onRetry?: () => void
+  isClubAdmin?: boolean
+  onPromoteMember?: (memberId: string) => Promise<void> | void
+  isPromotingMemberId?: string | null
 }
 
 export default function ClubMembersTable({
@@ -15,6 +18,9 @@ export default function ClubMembersTable({
   isError = false,
   errorMessage,
   onRetry,
+  isClubAdmin = false,
+  onPromoteMember,
+  isPromotingMemberId = null,
 }: ClubMembersTableProps) {
   const { t, i18n } = useTranslation()
 
@@ -146,6 +152,14 @@ export default function ClubMembersTable({
               >
                 {t('members.columns.joined', 'Joined')}
               </th>
+              {isClubAdmin && onPromoteMember && (
+                <th
+                  scope="col"
+                  className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-aurora-text-muted"
+                >
+                  {t('members.columns.actions', 'Actions')}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-aurora-border/60 bg-aurora-surface">
@@ -197,6 +211,39 @@ export default function ClubMembersTable({
                       {formatDate(member.joinedAtUtc)}
                     </span>
                   </td>
+                  {isClubAdmin && onPromoteMember && (
+                    <td className="whitespace-nowrap px-6 py-4 text-right text-xs">
+                      {member.role === 'Club Member' ? (
+                        <button
+                          type="button"
+                          data-testid={`promote-member-${member.memberId}`}
+                          disabled={isPromotingMemberId === member.memberId}
+                          onClick={() => void onPromoteMember(member.memberId)}
+                          className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-primary/10 px-3 py-1.5 font-semibold text-aurora-primary ring-1 ring-aurora-primary/20 hover:bg-aurora-primary/20 disabled:opacity-50 cursor-pointer transition-colors"
+                          aria-label={t('members.actions.promoteAria', { name: displayName })}
+                        >
+                          {isPromotingMemberId === member.memberId ? (
+                            <>
+                              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                              <span>{t('members.actions.promoting', 'Promoting…')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                              <span>{t('members.actions.promote', 'Make Admin')}</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-aurora-text-muted">—</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               )
             })}

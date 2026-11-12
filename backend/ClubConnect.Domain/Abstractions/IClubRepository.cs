@@ -124,4 +124,23 @@ public interface IClubRepository
         Guid clubId,
         Guid memberId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates the role of a member in a club workspace (e.g. promoting "Club Member" to "Club Admin").
+    /// Returns <c>true</c> if the membership was found and updated, otherwise <c>false</c>.
+    /// </summary>
+    Task<bool> UpdateMemberRoleAsync(
+        Guid clubId,
+        Guid memberId,
+        string newRole,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves a specific member's detail in a club workspace.
+    /// Returns <c>null</c> if the member does not belong to the club.
+    /// </summary>
+    Task<ClubMemberDetail?> GetClubMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken);
 }
