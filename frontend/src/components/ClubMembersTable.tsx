@@ -317,9 +317,13 @@ export default function ClubMembersTable({
               </h3>
             </div>
             <p className="mt-3 text-sm text-aurora-text-secondary leading-relaxed">
-              {t('members.removeModal.description', {
-                name: memberPendingRemoval.displayName?.trim() || memberPendingRemoval.email,
-              })}
+              {t(
+                'members.removeModal.description',
+                'Are you sure you want to remove this member from the club? They will immediately lose access to all club data and dashboards.',
+                {
+                  name: memberPendingRemoval.displayName?.trim() || memberPendingRemoval.email,
+                }
+              )}
             </p>
             <div className="mt-6 flex justify-end space-x-3">
               <button
