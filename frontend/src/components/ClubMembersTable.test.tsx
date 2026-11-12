@@ -82,4 +82,51 @@ describe('ClubMembersTable', () => {
     expect(screen.getByTestId('member-email-m-2')).toHaveTextContent('bob@example.com')
     expect(screen.getByTestId('member-role-m-2')).toHaveTextContent('dashboard.roleMember')
   })
+
+  it('renders Make Admin button for Club Member when isClubAdmin is true', () => {
+    const handlePromote = vi.fn()
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        onPromoteMember={handlePromote}
+      />
+    )
+
+    // Actions header is present
+    expect(screen.getByText('Actions')).toBeInTheDocument()
+
+    // Promote button exists for Bob (Club Member)
+    const promoteBobBtn = screen.getByTestId('promote-member-m-2')
+    expect(promoteBobBtn).toBeInTheDocument()
+    expect(promoteBobBtn).toHaveTextContent('Make Admin')
+
+    // Promote button does NOT exist for Alice (already Club Admin)
+    expect(screen.queryByTestId('promote-member-m-1')).not.toBeInTheDocument()
+
+    // Clicking promote button calls handler
+    fireEvent.click(promoteBobBtn)
+    expect(handlePromote).toHaveBeenCalledWith('m-2')
+  })
+
+  it('does not render Actions column when isClubAdmin is false', () => {
+    render(<ClubMembersTable members={sampleMembers} isClubAdmin={false} />)
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('promote-member-m-2')).not.toBeInTheDocument()
+  })
+
+  it('shows loading state on promote button when promotion is in flight', () => {
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        onPromoteMember={vi.fn()}
+        isPromotingMemberId="m-2"
+      />
+    )
+
+    const promoteBobBtn = screen.getByTestId('promote-member-m-2')
+    expect(promoteBobBtn).toBeDisabled()
+    expect(promoteBobBtn).toHaveTextContent('Promoting…')
+  })
 })
