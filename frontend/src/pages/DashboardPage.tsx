@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { type AuthenticatedMember } from './LobbyPage'
-import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers } from '../lib/api'
+import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole } from '../lib/api'
 import { useActiveClub } from '../lib/useActiveClub'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ClubMembersTable from '../components/ClubMembersTable'
@@ -38,6 +38,8 @@ export default function DashboardPage({
   }
 
   const [subView, setSubView] = useState<'overview' | 'members'>(getSubViewFromHash)
+  const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
+  const [promoteNotification, setPromoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     function handleHashChange() {
@@ -151,6 +153,30 @@ export default function DashboardPage({
   function toggleLanguage() {
     const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
     void i18n.changeLanguage(next)
+  }
+
+  async function handlePromoteMember(memberId: string) {
+    if (!targetClubId || promotingMemberId) return
+    setPromotingMemberId(memberId)
+    setPromoteNotification(null)
+
+    try {
+      const updated = await updateMemberRole(targetClubId, memberId, 'Club Admin', member.token)
+      await refetchMembers()
+      setPromoteNotification({
+        type: 'success',
+        message: t('members.actions.promoteSuccess', { name: updated.displayName || updated.email }),
+      })
+      setTimeout(() => setPromoteNotification(null), 4000)
+    } catch (err) {
+      setPromoteNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : t('members.actions.promoteError', 'Failed to promote member.'),
+      })
+      setTimeout(() => setPromoteNotification(null), 4000)
+    } finally {
+      setPromotingMemberId(null)
+    }
   }
 
   const isGeneralAccessDenied = Boolean(
@@ -371,12 +397,36 @@ export default function DashboardPage({
             </div>
           )}
 
+          {promoteNotification && (
+            <div
+              data-testid={promoteNotification.type === 'success' ? 'promote-success-alert' : 'promote-error-alert'}
+              className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
+                promoteNotification.type === 'success'
+                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
+                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+              }`}
+              role="alert"
+            >
+              <span>{promoteNotification.message}</span>
+              <button
+                type="button"
+                onClick={() => setPromoteNotification(null)}
+                className="ml-3 text-xs opacity-75 hover:opacity-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <ClubMembersTable
             members={clubMembers}
             isLoading={isLoadingMembers}
             isError={isMembersError}
             errorMessage={membersError instanceof Error ? membersError.message : undefined}
             onRetry={() => void refetchMembers()}
+            isClubAdmin={isClubAdmin}
+            onPromoteMember={handlePromoteMember}
+            isPromotingMemberId={promotingMemberId}
           />
         </div>
       ) : (

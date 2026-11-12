@@ -334,6 +334,31 @@ export async function getClubMembers(
   return (await res.json()) as ClubMemberDto[]
 }
 
+export async function updateMemberRole(
+  clubId: string,
+  memberId: string,
+  role: 'Club Admin' | 'Club Member',
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubMemberDto> {
+  const res = await fetchFn(`/api/clubs/${clubId}/members/${memberId}/role`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ role }),
+  })
+
+  if (!res.ok) {
+    const error = new Error(`Failed to update member role (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubMemberDto
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string
