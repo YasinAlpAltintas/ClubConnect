@@ -188,7 +188,15 @@
       "name": "Name",
       "email": "Email",
       "role": "Role",
-      "joined": "Joined"
+      "joined": "Joined",
+      "actions": "Actions"
+    },
+    "actions": {
+      "promote": "Make Admin",
+      "promoting": "Promoting…",
+      "promoteAria": "Promote {{name}} to Club Admin",
+      "promoteSuccess": "Successfully promoted {{name}} to Club Admin.",
+      "promoteError": "Failed to promote member to Club Admin."
     },
     "emptyTitle": "No members yet",
     "emptyDesc": "No active members were found in this club workspace.",

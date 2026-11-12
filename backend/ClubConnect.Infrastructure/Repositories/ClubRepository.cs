@@ -355,4 +355,44 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
             .AsNoTracking()
             .AnyAsync(m => m.ClubId == clubId && m.MemberId == memberId && m.Role == "Club Admin", cancellationToken);
     }
+
+    public async Task<bool> UpdateMemberRoleAsync(
+        Guid clubId,
+        Guid memberId,
+        string newRole,
+        CancellationToken cancellationToken)
+    {
+        var membership = await context.Memberships
+            .FirstOrDefaultAsync(m => m.ClubId == clubId && m.MemberId == memberId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            return false;
+        }
+
+        membership.Role = newRole;
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<ClubMemberDetail?> GetClubMemberAsync(
+        Guid clubId,
+        Guid memberId,
+        CancellationToken cancellationToken)
+    {
+        var membership = await context.Memberships
+            .AsNoTracking()
+            .Where(m => m.ClubId == clubId && m.MemberId == memberId)
+            .Select(m => new ClubMemberDetail(
+                m.MemberId,
+                m.Member!.DisplayName ?? string.Empty,
+                m.Member.Email,
+                m.Role,
+                m.JoinedAtUtc))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return membership;
+    }
 }
