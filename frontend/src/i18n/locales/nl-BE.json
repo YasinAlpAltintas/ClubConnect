@@ -194,6 +194,14 @@
     "emptyDesc": "Er zijn geen actieve leden gevonden in deze clubwerkruimte.",
     "errorTitle": "Kan leden niet laden",
     "errorMessage": "Ophalen van de ledenlijst voor deze club is mislukt.",
-    "accessDeniedMessage": "Je hebt geen beheerdersrechten om de leden van deze club te bekijken."
+    "accessDeniedMessage": "Je hebt geen beheerdersrechten om de leden van deze club te bekijken.",
+    "invite": {
+      "cardTitle": "Nieuwe leden uitnodigen",
+      "cardDescription": "Deel de 6-cijferige code van je club met studenten. Iedereen met deze code kan direct lid worden van {{clubName}}.",
+      "codeLabel": "Uitnodigingscode",
+      "copyButton": "Code kopiëren",
+      "copied": "Gekopieerd naar klembord!",
+      "adminOnlyBadge": "Alleen beheerder"
+    }
   }
 }
