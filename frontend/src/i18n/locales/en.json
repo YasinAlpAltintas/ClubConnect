@@ -194,6 +194,14 @@
     "emptyDesc": "No active members were found in this club workspace.",
     "errorTitle": "Unable to load members",
     "errorMessage": "Failed to retrieve member list for this club.",
-    "accessDeniedMessage": "You do not have administrative access to view this club's members."
+    "accessDeniedMessage": "You do not have administrative access to view this club's members.",
+    "invite": {
+      "cardTitle": "Invite New Members",
+      "cardDescription": "Share your club's 6-digit code with students. Anyone with this code can instantly join {{clubName}} as a Club Member.",
+      "codeLabel": "Invite Code",
+      "copyButton": "Copy Code",
+      "copied": "Copied to clipboard!",
+      "adminOnlyBadge": "Admin Only"
+    }
   }
 }
