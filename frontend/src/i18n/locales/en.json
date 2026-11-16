@@ -197,6 +197,12 @@
       "promoteAria": "Promote {{name}} to Club Admin",
       "promoteSuccess": "Successfully promoted {{name}} to Club Admin.",
       "promoteError": "Failed to promote member to Club Admin.",
+      "demote": "Demote",
+      "demoting": "Demoting…",
+      "demoteAria": "Demote {{name}} to Club Member",
+      "confirmDemote": "Demote to Member",
+      "demoteSuccess": "Successfully demoted {{name}} to Club Member.",
+      "demoteError": "Failed to demote member.",
       "remove": "Remove",
       "removing": "Removing…",
       "removeAria": "Remove {{name}} from club",
@@ -208,6 +214,10 @@
     "removeModal": {
       "title": "Remove Member",
       "description": "Are you sure you want to remove {{name}} from this club? They will immediately lose access to all club data and dashboards."
+    },
+    "demoteModal": {
+      "title": "Demote Administrator",
+      "description": "Are you sure you want to demote {{name}} to a standard Club Member? They will immediately lose administrative privileges for this club."
     },
     "emptyTitle": "No members yet",
     "emptyDesc": "No active members were found in this club workspace.",
