@@ -38,6 +38,11 @@ public class UpdateMemberRoleUseCase(IClubRepository clubRepository)
             return UpdateMemberRoleOutcome.InvalidInput("Role must be either 'Club Admin' or 'Club Member'.");
         }
 
+        if (command.RequestingMemberId == command.TargetMemberId)
+        {
+            return UpdateMemberRoleOutcome.InvalidInput("Club administrators cannot modify their own administrator role.");
+        }
+
         var club = await clubRepository.GetByIdAsync(command.ClubId, cancellationToken).ConfigureAwait(false);
         if (club is null)
         {
@@ -52,6 +57,25 @@ public class UpdateMemberRoleUseCase(IClubRepository clubRepository)
         if (!isRequestingAdmin)
         {
             return UpdateMemberRoleOutcome.Forbidden("Only club administrators can modify member roles.");
+        }
+
+        var targetMember = await clubRepository.GetClubMemberAsync(
+            command.ClubId,
+            command.TargetMemberId,
+            cancellationToken).ConfigureAwait(false);
+
+        if (targetMember is null)
+        {
+            return UpdateMemberRoleOutcome.NotFound("Target member not found in this club.");
+        }
+
+        if (command.Role == "Club Member" && targetMember.Role == "Club Admin")
+        {
+            var adminCount = await clubRepository.GetAdminCountForClubAsync(command.ClubId, cancellationToken).ConfigureAwait(false);
+            if (adminCount <= 1)
+            {
+                return UpdateMemberRoleOutcome.InvalidInput("Cannot demote the only club administrator. Assign another administrator first.");
+            }
         }
 
         var updated = await clubRepository.UpdateMemberRoleAsync(

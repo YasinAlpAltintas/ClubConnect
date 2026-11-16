@@ -158,8 +158,8 @@ public class UpdateMemberRoleUseCaseTests
             .ReturnsAsync(true);
 
         _clubRepoMock
-            .Setup(r => r.UpdateMemberRoleAsync(clubId, targetId, "Club Admin", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .Setup(r => r.GetClubMemberAsync(clubId, targetId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ClubMemberDetail?)null);
 
         var useCase = CreateUseCase();
         var outcome = await useCase.ExecuteAsync(new UpdateMemberRoleCommand
@@ -172,6 +172,113 @@ public class UpdateMemberRoleUseCaseTests
 
         Assert.Equal(UpdateMemberRoleStatus.NotFound, outcome.Status);
         Assert.Equal("Target member not found in this club.", outcome.Violation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SelfRoleModification_ReturnsInvalidInput()
+    {
+        var clubId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+
+        var useCase = CreateUseCase();
+        var outcome = await useCase.ExecuteAsync(new UpdateMemberRoleCommand
+        {
+            ClubId = clubId,
+            RequestingMemberId = adminId,
+            TargetMemberId = adminId,
+            Role = "Club Member"
+        });
+
+        Assert.Equal(UpdateMemberRoleStatus.InvalidInput, outcome.Status);
+        Assert.Equal("Club administrators cannot modify their own administrator role.", outcome.Violation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DemoteSoleAdmin_ReturnsInvalidInput()
+    {
+        var clubId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var targetAdminId = Guid.NewGuid();
+
+        _clubRepoMock
+            .Setup(r => r.GetByIdAsync(clubId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Club { Id = clubId, Name = "Chess Club" });
+
+        _clubRepoMock
+            .Setup(r => r.IsClubAdminAsync(clubId, adminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _clubRepoMock
+            .Setup(r => r.GetClubMemberAsync(clubId, targetAdminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClubMemberDetail(targetAdminId, "Target Admin", "admin@chess.org", "Club Admin", DateTimeOffset.UtcNow));
+
+        _clubRepoMock
+            .Setup(r => r.GetAdminCountForClubAsync(clubId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var useCase = CreateUseCase();
+        var outcome = await useCase.ExecuteAsync(new UpdateMemberRoleCommand
+        {
+            ClubId = clubId,
+            RequestingMemberId = adminId,
+            TargetMemberId = targetAdminId,
+            Role = "Club Member"
+        });
+
+        Assert.Equal(UpdateMemberRoleStatus.InvalidInput, outcome.Status);
+        Assert.Equal("Cannot demote the only club administrator. Assign another administrator first.", outcome.Violation);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DemoteAdminWhenMultipleAdminsExist_ReturnsSuccess()
+    {
+        var clubId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var targetAdminId = Guid.NewGuid();
+        var demotedDetail = new ClubMemberDetail(
+            targetAdminId,
+            "Target Admin",
+            "admin@chess.org",
+            "Club Member",
+            DateTimeOffset.UtcNow);
+
+        _clubRepoMock
+            .Setup(r => r.GetByIdAsync(clubId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Club { Id = clubId, Name = "Chess Club" });
+
+        _clubRepoMock
+            .Setup(r => r.IsClubAdminAsync(clubId, adminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _clubRepoMock
+            .Setup(r => r.GetClubMemberAsync(clubId, targetAdminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ClubMemberDetail(targetAdminId, "Target Admin", "admin@chess.org", "Club Admin", DateTimeOffset.UtcNow));
+
+        _clubRepoMock
+            .Setup(r => r.GetAdminCountForClubAsync(clubId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
+        _clubRepoMock
+            .Setup(r => r.UpdateMemberRoleAsync(clubId, targetAdminId, "Club Member", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _clubRepoMock
+            .Setup(r => r.GetClubMemberAsync(clubId, targetAdminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(demotedDetail);
+
+        var useCase = CreateUseCase();
+        var outcome = await useCase.ExecuteAsync(new UpdateMemberRoleCommand
+        {
+            ClubId = clubId,
+            RequestingMemberId = adminId,
+            TargetMemberId = targetAdminId,
+            Role = "Club Member"
+        });
+
+        Assert.Equal(UpdateMemberRoleStatus.Success, outcome.Status);
+        Assert.NotNull(outcome.Member);
+        Assert.Equal(targetAdminId, outcome.Member.MemberId);
+        Assert.Equal("Club Member", outcome.Member.Role);
     }
 
     [Fact]
