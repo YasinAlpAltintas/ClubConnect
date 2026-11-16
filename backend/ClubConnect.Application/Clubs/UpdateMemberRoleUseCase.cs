@@ -38,11 +38,6 @@ public class UpdateMemberRoleUseCase(IClubRepository clubRepository)
             return UpdateMemberRoleOutcome.InvalidInput("Role must be either 'Club Admin' or 'Club Member'.");
         }
 
-        if (command.RequestingMemberId == command.TargetMemberId)
-        {
-            return UpdateMemberRoleOutcome.InvalidInput("Club administrators cannot modify their own administrator role.");
-        }
-
         var club = await clubRepository.GetByIdAsync(command.ClubId, cancellationToken).ConfigureAwait(false);
         if (club is null)
         {
@@ -57,6 +52,11 @@ public class UpdateMemberRoleUseCase(IClubRepository clubRepository)
         if (!isRequestingAdmin)
         {
             return UpdateMemberRoleOutcome.Forbidden("Only club administrators can modify member roles.");
+        }
+
+        if (command.RequestingMemberId == command.TargetMemberId)
+        {
+            return UpdateMemberRoleOutcome.InvalidInput("Club administrators cannot modify their own administrator role.");
         }
 
         var targetMember = await clubRepository.GetClubMemberAsync(

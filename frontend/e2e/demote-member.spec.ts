@@ -82,7 +82,7 @@ test.describe('INC-19: Demote Club Admin to Club Member', () => {
     expect(demotedGetClubRes.status()).toBe(200)
     const demotedClubDetails = await demotedGetClubRes.json()
     expect(demotedClubDetails.role).toBe('Club Member')
-    expect(demotedClubDetails.inviteCode).toBeUndefined()
+    expect(demotedClubDetails.inviteCode).toBeNull()
 
     // 10. Attempting to demote Admin 1 (now the only remaining admin) -> 400 Bad Request
     const soleAdminDemoteRes = await request.patch(`/api/clubs/${club.id}/members/${admin1Id}/role`, {
@@ -172,7 +172,7 @@ test.describe('INC-19: Demote Club Admin to Club Member', () => {
 
     // "Make Admin" button is now visible again for this member
     await expect(page.getByTestId(`promote-member-${admin2Id}`)).toBeVisible()
-    await expect(page.queryByTestId(`demote-member-${admin2Id}`)).not.toBeVisible()
+    await expect(page.getByTestId(`demote-member-${admin2Id}`)).not.toBeVisible()
 
     // 9. Admin 1 logs out
     await page.getByTestId('dashboard-logout-btn').click()
@@ -190,7 +190,7 @@ test.describe('INC-19: Demote Club Admin to Club Member', () => {
 
     // Verify demoted member only sees Club Member role, no invite code, and no members management button
     await expect(page.getByTestId('dashboard-role-badge')).toHaveText(/Club Member|Clublid/i)
-    await expect(page.queryByTestId('dashboard-invite-code-section')).not.toBeVisible()
-    await expect(page.queryByTestId('dashboard-members-btn')).not.toBeVisible()
+    await expect(page.getByTestId('dashboard-invite-code-section')).not.toBeVisible()
+    await expect(page.getByTestId('dashboard-members-btn')).not.toBeVisible()
   })
 })

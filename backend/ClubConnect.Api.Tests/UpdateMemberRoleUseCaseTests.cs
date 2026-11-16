@@ -180,6 +180,14 @@ public class UpdateMemberRoleUseCaseTests
         var clubId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
 
+        _clubRepoMock
+            .Setup(r => r.GetByIdAsync(clubId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Club { Id = clubId, Name = "Test Club" });
+
+        _clubRepoMock
+            .Setup(r => r.IsClubAdminAsync(clubId, adminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
         var useCase = CreateUseCase();
         var outcome = await useCase.ExecuteAsync(new UpdateMemberRoleCommand
         {
