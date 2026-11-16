@@ -52,6 +52,12 @@ public class AuthController(
         bool Exists);
 
     /// <summary>Summary representation of a club in member club listings.</summary>
+    public sealed record UpdateProfileRequest(
+        [property: System.Text.Json.Serialization.JsonPropertyName("firstName")] string? FirstName = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("lastName")] string? LastName = null,
+        [property: System.Text.Json.Serialization.JsonPropertyName("displayName")] string? DisplayName = null);
+
+    /// <summary>Summary representation of a club in member club listings.</summary>
     public sealed record ClubSummaryResponse(
         Guid Id,
         string Name,
@@ -122,6 +128,60 @@ public class AuthController(
             JwtValidationStatus.Expired => Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." }),
             _ => Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." })
         };
+    }
+
+    /// <summary>
+    /// Updates the display name of the authenticated member.
+    /// 200 → updated · 400 → invalid name · 401 → unauthorized · 404 → not found.
+    /// </summary>
+    [HttpPatch("profile")]
+    [HttpPatch("me")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken = default)
+    {
+        var authHeader = Request?.Headers?.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var result = _jwtTokenService.ValidateToken(token);
+
+        if (result.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (result.Status != JwtValidationStatus.Valid || result.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        var candidateName = !string.IsNullOrWhiteSpace(request?.DisplayName)
+            ? request.DisplayName.Trim()
+            : $"{request?.FirstName?.Trim()} {request?.LastName?.Trim()}".Trim();
+
+        if (string.IsNullOrWhiteSpace(candidateName))
+        {
+            return BadRequest(new { error = "invalid_input", detail = "First name and last name cannot be empty." });
+        }
+
+        if (memberRepository is null)
+        {
+            return BadRequest(new { error = "service_unavailable", detail = "Member repository not configured." });
+        }
+
+        var updated = await memberRepository.UpdateDisplayNameAsync(result.MemberId.Value, candidateName, cancellationToken).ConfigureAwait(false);
+        if (updated is null)
+        {
+            return NotFound(new { error = "not_found", detail = "Member not found." });
+        }
+
+        var newToken = _jwtTokenService.GenerateToken(updated);
+        return Ok(new LoginResponse(updated.Id, updated.Email, updated.DisplayName, newToken));
     }
 
     /// <summary>

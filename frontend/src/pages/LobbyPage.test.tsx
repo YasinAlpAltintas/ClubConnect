@@ -47,12 +47,12 @@ describe('LobbyPage', () => {
     })
   })
 
-  it('renders lobby heading, welcome email, memberId, and displayName', () => {
+  it('renders lobby heading, welcome with displayName, and initials avatar', () => {
     renderLobbyPage({ member: dummyMember, onLogout: vi.fn(), initialClubs: [] })
 
     expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
-    expect(screen.getByText('Welcome back, visitor@example.com!')).toBeInTheDocument()
-    expect(screen.getByText('mem-12345')).toBeInTheDocument()
+    expect(screen.getByText('Welcome back, Test Visitor!')).toBeInTheDocument()
+    expect(screen.queryByText('mem-12345')).not.toBeInTheDocument()
     expect(screen.getByText('Test Visitor')).toBeInTheDocument()
   })
 

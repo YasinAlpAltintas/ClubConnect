@@ -79,13 +79,13 @@ export default function InviteCodeCard({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-aurora-accent/15 text-aurora-accent text-xs">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-aurora-primary/15 text-aurora-primary text-xs">
                 ✉️
               </span>
               <h2 className="text-sm font-semibold text-aurora-text">
                 {t('members.invite.cardTitle')}
               </h2>
-              <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-accent ring-1 ring-aurora-border">
+              <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-primary ring-1 ring-aurora-border">
                 {t('members.invite.adminOnlyBadge')}
               </span>
             </div>
@@ -104,7 +104,7 @@ export default function InviteCodeCard({
               </span>
               <span
                 data-testid="invite-code-value"
-                className="font-mono text-base font-bold tracking-widest text-aurora-accent"
+                className="font-mono text-base font-bold tracking-widest text-aurora-primary"
               >
                 {code}
               </span>
@@ -114,7 +114,7 @@ export default function InviteCodeCard({
               type="button"
               data-testid="members-copy-invite-code"
               onClick={() => void handleCopy()}
-              className="btn-tactile inline-flex items-center gap-1.5 rounded-xl bg-aurora-accent px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95 cursor-pointer transition-all"
+              className="btn-tactile inline-flex items-center gap-1.5 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-all"
               aria-label={t('members.invite.copyButton')}
             >
               {copied ? (
