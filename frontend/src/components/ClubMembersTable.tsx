@@ -14,6 +14,8 @@ export interface ClubMembersTableProps {
   isPromotingMemberId?: string | null
   onRemoveMember?: (memberId: string) => Promise<void> | void
   isRemovingMemberId?: string | null
+  onDemoteMember?: (memberId: string) => Promise<void> | void
+  isDemotingMemberId?: string | null
 }
 
 export default function ClubMembersTable({
@@ -28,9 +30,12 @@ export default function ClubMembersTable({
   isPromotingMemberId = null,
   onRemoveMember,
   isRemovingMemberId = null,
+  onDemoteMember,
+  isDemotingMemberId = null,
 }: ClubMembersTableProps) {
   const { t, i18n } = useTranslation()
   const [memberPendingRemoval, setMemberPendingRemoval] = useState<ClubMemberDto | null>(null)
+  const [memberPendingDemotion, setMemberPendingDemotion] = useState<ClubMemberDto | null>(null)
 
   function formatDate(isoString: string): string {
     if (!isoString) return ''
@@ -160,7 +165,7 @@ export default function ClubMembersTable({
               >
                 {t('members.columns.joined', 'Joined')}
               </th>
-              {isClubAdmin && (onPromoteMember || onRemoveMember) && (
+              {isClubAdmin && (onPromoteMember || onDemoteMember || onRemoveMember) && (
                 <th
                   scope="col"
                   className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-aurora-text-muted"
@@ -219,7 +224,7 @@ export default function ClubMembersTable({
                       {formatDate(member.joinedAtUtc)}
                     </span>
                   </td>
-                  {isClubAdmin && (onPromoteMember || onRemoveMember) && (
+                  {isClubAdmin && (onPromoteMember || onDemoteMember || onRemoveMember) && (
                     <td className="whitespace-nowrap px-6 py-4 text-right text-xs">
                       <div className="flex items-center justify-end space-x-2">
                         {currentMemberId && member.memberId === currentMemberId ? (
@@ -235,7 +240,7 @@ export default function ClubMembersTable({
                               <button
                                 type="button"
                                 data-testid={`promote-member-${member.memberId}`}
-                                disabled={isPromotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
+                                disabled={isPromotingMemberId === member.memberId || isDemotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
                                 onClick={() => void onPromoteMember(member.memberId)}
                                 className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-primary/10 px-3 py-1.5 font-semibold text-aurora-primary ring-1 ring-aurora-primary/20 hover:bg-aurora-primary/20 disabled:opacity-50 cursor-pointer transition-colors"
                                 aria-label={t('members.actions.promoteAria', { name: displayName })}
@@ -258,11 +263,38 @@ export default function ClubMembersTable({
                                 )}
                               </button>
                             )}
+                            {onDemoteMember && member.role === 'Club Admin' && (
+                              <button
+                                type="button"
+                                data-testid={`demote-member-${member.memberId}`}
+                                disabled={isPromotingMemberId === member.memberId || isDemotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
+                                onClick={() => setMemberPendingDemotion(member)}
+                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-400 ring-1 ring-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50 cursor-pointer transition-colors"
+                                aria-label={t('members.actions.demoteAria', { name: displayName })}
+                              >
+                                {isDemotingMemberId === member.memberId ? (
+                                  <>
+                                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>{t('members.actions.demoting', 'Demoting…')}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                    <span>{t('members.actions.demote', 'Demote')}</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
                             {onRemoveMember && (
                               <button
                                 type="button"
                                 data-testid={`remove-member-${member.memberId}`}
-                                disabled={isPromotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
+                                disabled={isPromotingMemberId === member.memberId || isDemotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
                                 onClick={() => setMemberPendingRemoval(member)}
                                 className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 font-semibold text-red-400 ring-1 ring-red-500/20 hover:bg-red-500/20 disabled:opacity-50 cursor-pointer transition-colors"
                                 aria-label={t('members.actions.removeAria', { name: displayName })}
@@ -348,6 +380,63 @@ export default function ClubMembersTable({
                 className="btn-tactile rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-600 disabled:opacity-50 cursor-pointer transition-colors"
               >
                 {t('members.actions.confirmRemove', 'Remove Member')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {memberPendingDemotion && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="demote-modal-title"
+          data-testid="demote-member-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 id="demote-modal-title" className="text-lg font-bold text-aurora-text">
+                {t('members.demoteModal.title', 'Demote Administrator')}
+              </h3>
+            </div>
+            <p className="mt-3 text-sm text-aurora-text-secondary leading-relaxed">
+              {t(
+                'members.demoteModal.description',
+                'Are you sure you want to demote this administrator to a standard Club Member? They will lose administrative privileges for this club.',
+                {
+                  name: memberPendingDemotion.displayName?.trim() || memberPendingDemotion.email,
+                }
+              )}
+            </p>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                data-testid="cancel-demote-member-btn"
+                onClick={() => setMemberPendingDemotion(null)}
+                className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="confirm-demote-member-btn"
+                disabled={isDemotingMemberId === memberPendingDemotion.memberId}
+                onClick={async () => {
+                  const idToDemote = memberPendingDemotion.memberId
+                  setMemberPendingDemotion(null)
+                  if (onDemoteMember) {
+                    await onDemoteMember(idToDemote)
+                  }
+                }}
+                className="btn-tactile rounded-xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-600 disabled:opacity-50 cursor-pointer transition-colors"
+              >
+                {t('members.actions.confirmDemote', 'Demote to Member')}
               </button>
             </div>
           </div>
