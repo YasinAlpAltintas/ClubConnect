@@ -159,4 +159,21 @@ public interface IClubRepository
     Task<int> GetAdminCountForClubAsync(
         Guid clubId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves scheduled events for a specific club within an optional date-time range.
+    /// Ordered chronologically by start time.
+    /// </summary>
+    Task<IReadOnlyList<ClubEvent>> GetEventsForClubAsync(
+        Guid clubId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds a new scheduled event to a club workspace.
+    /// </summary>
+    Task<ClubEvent> CreateEventAsync(
+        ClubEvent clubEvent,
+        CancellationToken cancellationToken);
 }

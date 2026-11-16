@@ -423,4 +423,39 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
             .AsNoTracking()
             .CountAsync(m => m.ClubId == clubId && m.Role == "Club Admin", cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ClubEvent>> GetEventsForClubAsync(
+        Guid clubId,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        CancellationToken cancellationToken)
+    {
+        var query = context.Events
+            .AsNoTracking()
+            .Where(e => e.ClubId == clubId);
+
+        if (fromUtc.HasValue)
+        {
+            query = query.Where(e => e.EndTimeUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            query = query.Where(e => e.StartTimeUtc <= toUtc.Value);
+        }
+
+        return await query
+            .OrderBy(e => e.StartTimeUtc)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<ClubEvent> CreateEventAsync(
+        ClubEvent clubEvent,
+        CancellationToken cancellationToken)
+    {
+        await context.Events.AddAsync(clubEvent, cancellationToken).ConfigureAwait(false);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return clubEvent;
+    }
 }

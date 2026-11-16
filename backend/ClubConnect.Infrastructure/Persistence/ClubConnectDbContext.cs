@@ -22,6 +22,8 @@ public class ClubConnectDbContext : DbContext
 
     public DbSet<ClubInvite> ClubInvites => Set<ClubInvite>();
 
+    public DbSet<ClubEvent> Events => Set<ClubEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // The Application layer canonicalizes e-mail (lower-cased, trimmed)
@@ -125,6 +127,45 @@ public class ClubConnectDbContext : DbContext
 
             entity.HasIndex(i => i.ClubId)
                 .HasDatabaseName("IX_ClubInvites_ClubId");
+        });
+
+        modelBuilder.Entity<ClubEvent>(entity =>
+        {
+            entity.ToTable("ClubEvents");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Title)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Location)
+                .HasMaxLength(200);
+
+            entity.Property(e => e.StartTimeUtc)
+                .IsRequired();
+
+            entity.Property(e => e.EndTimeUtc)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAtUtc)
+                .IsRequired();
+
+            entity.HasOne(e => e.Club)
+                .WithMany(c => c.Events)
+                .HasForeignKey(e => e.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedByMember)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.ClubId, e.StartTimeUtc })
+                .HasDatabaseName("IX_ClubEvents_ClubId_StartTimeUtc");
         });
     }
 }
