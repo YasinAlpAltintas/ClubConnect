@@ -32,4 +32,13 @@ public sealed class MemberRepository(ClubConnectDbContext context) : IMemberRepo
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
+
+    public async Task<Member?> UpdateDisplayNameAsync(Guid id, string displayName, CancellationToken cancellationToken = default)
+    {
+        var member = await context.Members.FirstOrDefaultAsync(m => m.Id == id, cancellationToken).ConfigureAwait(false);
+        if (member is null) return null;
+        member.DisplayName = displayName;
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return member;
+    }
 }

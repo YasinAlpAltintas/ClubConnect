@@ -72,9 +72,11 @@
   },
   "lobby": {
     "title": "Club Lobby",
-    "welcome": "Welkom terug, {{email}}!",
+    "welcome": "Welkom terug, {{name}}!",
+    "welcomeWithEmail": "Welkom terug, {{email}}!",
     "memberId": "Lid ID",
-    "subtitle": "Je bent ingelogd op ClubConnect.",
+    "connected": "Verbonden",
+    "subtitle": "",
     "logout": "Uitloggen",
     "myClubs": "Mijn Clubs",
     "loading": "Je clubs worden geladen…",
@@ -231,6 +233,52 @@
       "copyButton": "Code kopiëren",
       "copied": "Gekopieerd naar klembord!",
       "adminOnlyBadge": "Alleen beheerder"
+    }
+  },
+  "calendar": {
+    "title": "Clubkalender",
+    "subtitle": "Maandelijks schema en evenementen voor {{clubName}}.",
+    "backToDashboard": "Terug naar Dashboard",
+    "navButton": "Kalender",
+    "viewCalendar": "Bekijk Kalender",
+    "openCalendar": "Open Kalender",
+    "today": "Vandaag",
+    "prevMonth": "Vorige Maand",
+    "nextMonth": "Volgende Maand",
+    "eventCount_one": "1 evenement deze maand",
+    "eventCount_other": "{{count}} evenementen deze maand",
+    "eventCount": "{{count}} evenementen deze maand",
+    "emptyTitle": "Geen evenementen gepland",
+    "emptyDesc": "Er zijn geen activiteiten of bijeenkomsten gepland voor deze maand.",
+    "weekdays": {
+      "mon": "Ma",
+      "tue": "Di",
+      "wed": "Wo",
+      "thu": "Do",
+      "fri": "Vr",
+      "sat": "Za",
+      "sun": "Zo"
+    },
+    "eventDetails": {
+      "title": "Evenementdetails",
+      "location": "Locatie",
+      "time": "Tijdstip",
+      "description": "Beschrijving",
+      "close": "Sluiten"
+    }
+  },
+  "onboarding": {
+    "title": "Welkom bij ClubConnect!",
+    "subtitle": "Vul je voornaam en achternaam in om je profiel te voltooien.",
+    "firstName": "Voornaam",
+    "firstNamePlaceholder": "Bijv. Alex",
+    "lastName": "Achternaam",
+    "lastNamePlaceholder": "Bijv. Jansen",
+    "submit": "Opslaan en doorgaan",
+    "submitting": "Bezig met opslaan…",
+    "errors": {
+      "firstNameRequired": "Vul je voornaam in.",
+      "lastNameRequired": "Vul je achternaam in."
     }
   }
 }

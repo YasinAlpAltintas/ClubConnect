@@ -72,9 +72,11 @@
   },
   "lobby": {
     "title": "Club Lobby",
-    "welcome": "Welcome back, {{email}}!",
+    "welcome": "Welcome back, {{name}}!",
+    "welcomeWithEmail": "Welcome back, {{email}}!",
     "memberId": "Member ID",
-    "subtitle": "You are logged in to ClubConnect.",
+    "connected": "Connected",
+    "subtitle": "",
     "logout": "Log out",
     "myClubs": "My Clubs",
     "loading": "Loading your clubs…",
@@ -231,6 +233,52 @@
       "copyButton": "Copy Code",
       "copied": "Copied to clipboard!",
       "adminOnlyBadge": "Admin Only"
+    }
+  },
+  "calendar": {
+    "title": "Club Calendar",
+    "subtitle": "Monthly schedule and events for {{clubName}}.",
+    "backToDashboard": "Back to Dashboard",
+    "navButton": "Calendar",
+    "viewCalendar": "View Calendar",
+    "openCalendar": "Open Calendar",
+    "today": "Today",
+    "prevMonth": "Previous Month",
+    "nextMonth": "Next Month",
+    "eventCount_one": "1 event this month",
+    "eventCount_other": "{{count}} events this month",
+    "eventCount": "{{count}} events this month",
+    "emptyTitle": "No events scheduled",
+    "emptyDesc": "No activities or gatherings are scheduled for this month.",
+    "weekdays": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "eventDetails": {
+      "title": "Event Details",
+      "location": "Location",
+      "time": "Time",
+      "description": "Description",
+      "close": "Close"
+    }
+  },
+  "onboarding": {
+    "title": "Welcome to ClubConnect!",
+    "subtitle": "Enter your first and last name to complete your profile.",
+    "firstName": "First name",
+    "firstNamePlaceholder": "e.g. Alex",
+    "lastName": "Last name",
+    "lastNamePlaceholder": "e.g. Jansen",
+    "submit": "Save and continue",
+    "submitting": "Saving…",
+    "errors": {
+      "firstNameRequired": "First name is required.",
+      "lastNameRequired": "Last name is required."
     }
   }
 }

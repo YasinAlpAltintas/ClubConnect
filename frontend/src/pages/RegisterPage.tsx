@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { registerSchema, type RegisterInput } from '../schemas/register'
 import { registerMember, checkEmailExists, type RegisterSuccessResponse } from '../lib/api'
 import { apiErrorToKey } from '../lib/mapApiError'
-import { type SupportedLanguage } from '../i18n'
 import ThemeToggle from '../components/ThemeToggle'
+import LanguageToggle from '../components/LanguageToggle'
 
 type FieldError = 'email' | 'password' | null
 
@@ -16,7 +16,7 @@ export interface RegisterPageProps {
 }
 
 export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = {}) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [serverError, setServerError] = useState<{ key: string; status?: number } | null>(null)
   const [fieldError, setFieldError] = useState<FieldError>(null)
   const [emailConflict, setEmailConflict] = useState(false)
@@ -37,11 +37,6 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
     mutationFn: ({ email, password }: RegisterInput) =>
       registerMember({ email, password }),
   })
-
-  function toggleLanguage() {
-    const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
-    void i18n.changeLanguage(next)
-  }
 
   async function handleEmailBlur() {
     const emailVal = getValues('email')
@@ -111,13 +106,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
           )}
           <div className="mt-8 flex items-center justify-end gap-3">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={toggleLanguage}
-              className="text-xs font-medium text-aurora-text-muted hover:text-aurora-text transition-colors cursor-pointer"
-            >
-              {t('header.languageToggle')}
-            </button>
+            <LanguageToggle />
           </div>
         </section>
       </main>
@@ -132,13 +121,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
         </span>
         <div className="flex items-center space-x-2">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-          >
-            {t('header.languageToggle')}
-          </button>
+          <LanguageToggle />
         </div>
       </header>
 

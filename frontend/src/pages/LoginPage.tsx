@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { loginSchema, type LoginInput } from '../schemas/login'
 import { loginMember, type LoginSuccessResponse } from '../lib/api'
 import { loginApiErrorToKey, type ResolvedLoginApiError } from '../lib/mapApiError'
-import { type SupportedLanguage } from '../i18n'
 import ThemeToggle from '../components/ThemeToggle'
+import LanguageToggle from '../components/LanguageToggle'
 
 export interface LoginPageProps {
   onLoginSuccess: (member: LoginSuccessResponse) => void
@@ -20,7 +20,7 @@ export default function LoginPage({
   onNavigateToRegister,
   sessionExpired = false,
 }: LoginPageProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [serverError, setServerError] = useState<ResolvedLoginApiError | null>(null)
   const [dismissedNotice, setDismissedNotice] = useState(false)
   const showExpiredNotice = sessionExpired && !dismissedNotice
@@ -39,11 +39,6 @@ export default function LoginPage({
     mutationFn: ({ email, password }: LoginInput) =>
       loginMember({ email, password }),
   })
-
-  function toggleLanguage() {
-    const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
-    void i18n.changeLanguage(next)
-  }
 
   function onSubmit(data: LoginInput) {
     setServerError(null)
@@ -67,13 +62,7 @@ export default function LoginPage({
         </span>
         <div className="flex items-center space-x-2">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-          >
-            {t('header.languageToggle')}
-          </button>
+          <LanguageToggle />
         </div>
       </header>
 

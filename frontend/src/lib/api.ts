@@ -380,6 +380,46 @@ export async function removeClubMember(
   }
 }
 
+export interface ClubEventDto {
+  id: string
+  clubId: string
+  title: string
+  description?: string | null
+  location?: string | null
+  startTimeUtc: string
+  endTimeUtc: string
+  createdByMemberId: string
+  createdAtUtc: string
+}
+
+export async function getClubEvents(
+  clubId: string,
+  options?: { year?: number; month?: number },
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubEventDto[]> {
+  const queryParams = new URLSearchParams()
+  if (options?.year) queryParams.set('year', String(options.year))
+  if (options?.month) queryParams.set('month', String(options.month))
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
+  const res = await fetchFn(`/api/clubs/${clubId}/events${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const error = new Error(`Failed to fetch club events (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubEventDto[]
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string
@@ -577,5 +617,51 @@ export async function joinClub(
     name: data.name,
     description: data.description,
     role: data.role,
+  }
+}
+
+export interface UpdateProfileRequest {
+  firstName?: string
+  lastName?: string
+  displayName?: string
+}
+
+export async function updateMemberProfile(
+  token: string,
+  request: UpdateProfileRequest,
+  fetchFn: typeof fetch = fetch,
+): Promise<LoginSuccessResponse> {
+  let response: Response
+  try {
+    response = await fetchFn('/api/auth/profile', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new Error('Network error while updating profile.')
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    payload = undefined
+  }
+
+  if (!response.ok) {
+    const errorMsg = extractErrorString(payload) || `Error ${response.status}`
+    throw new Error(errorMsg)
+  }
+
+  const data = payload as LoginSuccessResponse
+  return {
+    memberId: data.memberId,
+    email: data.email,
+    displayName: data.displayName,
+    token: data.token,
   }
 }

@@ -19,7 +19,8 @@ public class ClubsController(
     IClubRepository? clubRepository = null,
     GetClubMembersUseCase? getClubMembersUseCase = null,
     UpdateMemberRoleUseCase? updateMemberRoleUseCase = null,
-    RemoveClubMemberUseCase? removeClubMemberUseCase = null) : ControllerBase
+    RemoveClubMemberUseCase? removeClubMemberUseCase = null,
+    GetClubEventsUseCase? getClubEventsUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -445,6 +446,89 @@ public class ClubsController(
             RemoveClubMemberStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
             RemoveClubMemberStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "removal_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>Response item for <c>GET /api/clubs/{id}/events</c>.</summary>
+    public sealed record ClubEventResponse(
+        Guid Id,
+        Guid ClubId,
+        string Title,
+        string? Description,
+        string? Location,
+        DateTimeOffset StartTimeUtc,
+        DateTimeOffset EndTimeUtc,
+        Guid CreatedByMemberId,
+        DateTimeOffset CreatedAtUtc);
+
+    /// <summary>
+    /// Retrieves scheduled events for the specified club workspace (INC-23).
+    /// Filterable by year and month.
+    /// Enforces tenant isolation: only authenticated members of the club can view its calendar.
+    /// 200 → events list · 400 → invalid year/month · 401 → unauthenticated · 403 → forbidden · 404 → club not found.
+    /// </summary>
+    [HttpGet("{id:guid}/events")]
+    [ProducesResponseType(typeof(IEnumerable<ClubEventResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClubEvents(
+        [FromRoute] Guid id,
+        [FromQuery] int? year,
+        [FromQuery] int? month,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (getClubEventsUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Event retrieval service is unavailable." });
+        }
+
+        var query = new GetClubEventsQuery
+        {
+            ClubId = id,
+            RequestingMemberId = validation.MemberId.Value,
+            Year = year,
+            Month = month
+        };
+
+        var outcome = await getClubEventsUseCase.ExecuteAsync(query, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            GetClubEventsStatus.Success => Ok(outcome.Events.Select(e => new ClubEventResponse(
+                e.Id,
+                e.ClubId,
+                e.Title,
+                e.Description,
+                e.Location,
+                e.StartTimeUtc,
+                e.EndTimeUtc,
+                e.CreatedByMemberId,
+                e.CreatedAtUtc))),
+            GetClubEventsStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            GetClubEventsStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            GetClubEventsStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
         };
     }
 }

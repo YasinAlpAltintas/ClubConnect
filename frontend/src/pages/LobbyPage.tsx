@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type SupportedLanguage } from '../i18n'
 import {
   getMemberClubs,
   createClub,
   CreateClubApiException,
   joinClub,
   JoinClubApiException,
+  updateMemberProfile,
   type ClubDto,
 } from '../lib/api'
 import { createClubSchema } from '../schemas/club'
 import { inviteCodeSchema } from '../schemas/invite'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ThemeToggle from '../components/ThemeToggle'
+import LanguageToggle from '../components/LanguageToggle'
+import { setStoredToken } from '../lib/jwt'
 import { useActiveClub } from '../lib/useActiveClub'
 
 export interface AuthenticatedMember {
@@ -40,7 +42,7 @@ export default function LobbyPage({
   initialClubs,
   onEnterDashboard,
 }: LobbyPageProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const [modalType, setModalType] = useState<ModalType>(null)
@@ -64,6 +66,50 @@ export default function LobbyPage({
   const [isJoiningModal, setIsJoiningModal] = useState(false)
   const [copiedClubId, setCopiedClubId] = useState<string | null>(null)
 
+  // Current authenticated member with dynamic profile updates
+  const [currentMember, setCurrentMember] = useState<AuthenticatedMember>(member)
+
+  function handleProfileUpdated(displayName: string, newToken?: string) {
+    setCurrentMember((prev) => ({
+      ...prev,
+      displayName,
+      token: newToken || prev.token,
+    }))
+    if (newToken) {
+      setStoredToken(newToken)
+    }
+  }
+
+  // First-time onboarding state
+  const [onboardingFirstName, setOnboardingFirstName] = useState('')
+  const [onboardingLastName, setOnboardingLastName] = useState('')
+  const [onboardingError, setOnboardingError] = useState<string | null>(null)
+  const [isOnboardingSubmitting, setIsOnboardingSubmitting] = useState(false)
+
+  async function handleInlineSaveName(e: React.FormEvent) {
+    e.preventDefault()
+    setOnboardingError(null)
+    const first = onboardingFirstName.trim()
+    const last = onboardingLastName.trim()
+    if (!first || !last) {
+      setOnboardingError(t('onboarding.errors.firstNameRequired'))
+      return
+    }
+    if (!currentMember.token) return
+    setIsOnboardingSubmitting(true)
+    try {
+      const response = await updateMemberProfile(currentMember.token, {
+        firstName: first,
+        lastName: last,
+      })
+      handleProfileUpdated(response.displayName || `${first} ${last}`, response.token)
+    } catch (err) {
+      setOnboardingError(err instanceof Error ? err.message : 'Error updating profile')
+    } finally {
+      setIsOnboardingSubmitting(false)
+    }
+  }
+
   const { data: clubs = initialClubs ?? [], isLoading } = useQuery<ClubDto[]>({
     queryKey: ['memberClubs', member.token],
     queryFn: () => getMemberClubs(member.token),
@@ -75,11 +121,6 @@ export default function LobbyPage({
     clubs,
     memberId: member.memberId,
   })
-
-  function toggleLanguage() {
-    const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
-    void i18n.changeLanguage(next)
-  }
 
   function handleCopyInviteCode(clubId: string, code: string) {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -253,26 +294,19 @@ export default function LobbyPage({
           <span className="text-xl font-bold tracking-tight text-aurora-primary">
             {t('app.name')}
           </span>
-          <span className="hidden sm:inline-flex items-center rounded-full bg-aurora-primary/10 px-2.5 py-0.5 text-xs font-medium text-aurora-muted ring-1 ring-aurora-primary/20">
-            Student Portal
-          </span>
           <ClubSwitcherDropdown
             clubs={clubs}
             activeClubId={activeClubId}
             onSelectClub={setActiveClubId}
+            hideSingleIndicator={true}
           />
         </div>
         <div className="flex items-center space-x-3">
           <ThemeToggle />
+          <LanguageToggle />
           <button
             type="button"
-            onClick={toggleLanguage}
-            className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-          >
-            {t('header.languageToggle')}
-          </button>
-          <button
-            type="button"
+            data-testid="header-logout-btn"
             onClick={onLogout}
             className="btn-tactile rounded-xl bg-aurora-elevated px-3 py-1.5 text-xs font-medium text-aurora-text hover:bg-aurora-border cursor-pointer transition-colors"
           >
@@ -290,42 +324,82 @@ export default function LobbyPage({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="h-0.5 w-16 rounded-full bg-gradient-to-r from-aurora-primary to-aurora-secondary mb-3" />
-              <div className="flex items-center space-x-3">
-                <h1 className="text-2xl font-bold tracking-tight text-aurora-text">
-                  {t('lobby.title')}
-                </h1>
-                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 ring-1 ring-emerald-500/20 ring-inset">
-                  Connected
-                </span>
-              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-aurora-text">
+                {t('lobby.title')}
+              </h1>
               <p className="mt-1 font-medium text-aurora-text">
-                {t('lobby.welcome', { email: member.email })}
-              </p>
-              <p className="text-sm text-aurora-text-secondary">
-                {t('lobby.subtitle')}
+                {t('lobby.welcome', {
+                  name: currentMember.displayName || currentMember.email,
+                  email: currentMember.email,
+                })}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <div className="rounded-xl bg-aurora-elevated px-3 py-2 ring-1 ring-aurora-border text-xs">
-                <span className="font-medium text-aurora-text-muted">{t('lobby.memberId')}: </span>
-                <span className="font-mono font-medium text-aurora-text select-all">{member.memberId}</span>
-              </div>
-              {member.displayName && (
-                <div className="rounded-xl bg-aurora-elevated px-3 py-2 ring-1 ring-aurora-border text-xs">
-                  <span className="font-medium text-aurora-text-muted">Name: </span>
-                  <span className="font-medium text-aurora-text">{member.displayName}</span>
+            {currentMember.displayName && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-aurora-primary/10 text-aurora-primary font-bold text-sm ring-1 ring-aurora-primary/20">
+                  {currentMember.displayName
+                    .split(' ')
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()}
                 </div>
-              )}
-              <button
-                type="button"
-                onClick={onLogout}
-                className="btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-medium text-aurora-text hover:bg-aurora-border cursor-pointer transition-colors"
-              >
-                {t('lobby.logout')}
-              </button>
-            </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-aurora-text">{currentMember.displayName}</p>
+                  <p className="text-xs text-aurora-text-muted">{currentMember.email}</p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* First-time onboarding: Enter First Name & Surname */}
+          {!currentMember.displayName && (
+            <div data-testid="onboarding-name-prompt" className="mt-5 rounded-xl bg-aurora-elevated p-4 sm:p-5 ring-1 ring-aurora-border">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-aurora-text flex items-center gap-2">
+                    <span>👋</span> {t('onboarding.title')}
+                  </h2>
+                  <p className="text-xs text-aurora-text-secondary mt-1">
+                    {t('onboarding.subtitle')}
+                  </p>
+                </div>
+              </div>
+
+              {onboardingError && (
+                <p className="mt-2 text-xs text-red-400 font-medium">{onboardingError}</p>
+              )}
+
+              <form onSubmit={handleInlineSaveName} className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  data-testid="onboarding-first-name"
+                  placeholder={t('onboarding.firstName')}
+                  value={onboardingFirstName}
+                  onChange={(e) => setOnboardingFirstName(e.target.value)}
+                  className="rounded-xl bg-aurora-surface px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                />
+                <input
+                  type="text"
+                  data-testid="onboarding-last-name"
+                  placeholder={t('onboarding.lastName')}
+                  value={onboardingLastName}
+                  onChange={(e) => setOnboardingLastName(e.target.value)}
+                  className="rounded-xl bg-aurora-surface px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  data-testid="onboarding-submit-btn"
+                  disabled={isOnboardingSubmitting}
+                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all shrink-0"
+                >
+                  {isOnboardingSubmitting ? t('onboarding.submitting') : t('onboarding.submit')}
+                </button>
+              </form>
+            </div>
+          )}
         </section>
 
         {/* Active Club Workspace Banner */}
@@ -433,9 +507,26 @@ export default function LobbyPage({
           </div>
 
           {isLoading ? (
-            <div className="rounded-2xl bg-aurora-surface p-12 text-center shadow-xs ring-1 ring-aurora-border">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-aurora-primary border-r-transparent align-[-0.125em]" />
-              <p className="mt-4 text-sm font-medium text-aurora-text-secondary">{t('lobby.loading')}</p>
+            <div data-testid="lobby-skeleton-grid" aria-busy="true" className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-2xl bg-aurora-surface p-6 ring-1 ring-aurora-border shadow-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-3/5 rounded-lg bg-aurora-elevated" />
+                    <div className="h-5 w-16 rounded-full bg-aurora-elevated" />
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="h-3.5 w-full rounded-md bg-aurora-elevated" />
+                    <div className="h-3.5 w-4/5 rounded-md bg-aurora-elevated" />
+                  </div>
+                  <div className="mt-6 flex items-center justify-between pt-4 border-t border-aurora-border/50">
+                    <div className="h-4 w-16 rounded-md bg-aurora-elevated" />
+                    <div className="h-8 w-28 rounded-xl bg-aurora-elevated" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : clubs.length === 0 ? (
             /* INC-10: Empty Lobby State with Clear Calls-to-Action */
@@ -923,6 +1014,18 @@ export default function LobbyPage({
           </div>
         </div>
       )}
+
+      {/* Bottom-left Connected status indicator */}
+      <div
+        data-testid="lobby-connected-status"
+        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full bg-aurora-surface/90 px-3 py-1.5 text-xs font-medium text-aurora-text ring-1 ring-aurora-border shadow-md backdrop-blur-md select-none"
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        </span>
+        <span className="text-aurora-text-secondary">{t('lobby.connected', 'Connected')}</span>
+      </div>
     </main>
   )
 }

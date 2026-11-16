@@ -399,4 +399,102 @@ public class AuthControllerTests
         var result = await controller.GetMyClubs();
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
+
+    [Fact]
+    public async Task UpdateProfile_ValidPayload_ReturnsOkWithUpdatedProfile()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var memberId = Guid.NewGuid();
+        var member = new Member
+        {
+            Id = memberId,
+            Email = "member@example.com",
+            DisplayName = string.Empty,
+            PasswordHash = "hash",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var token = jwtService.GenerateToken(member);
+
+        var updatedMember = new Member
+        {
+            Id = memberId,
+            Email = "member@example.com",
+            DisplayName = "Alex Jansen",
+            PasswordHash = "hash",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        _members.Setup(m => m.UpdateDisplayNameAsync(memberId, "Alex Jansen", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(updatedMember);
+
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, jwtService, _members.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.Request.Headers.Authorization = $"Bearer {token}";
+
+        var request = new AuthController.UpdateProfileRequest(FirstName: "Alex", LastName: "Jansen");
+        var result = await controller.UpdateProfile(request);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthController.LoginResponse>(okResult.Value);
+        Assert.Equal("Alex Jansen", response.DisplayName);
+        Assert.NotNull(response.Token);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithoutToken_ReturnsUnauthorized()
+    {
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, null, _members.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        var request = new AuthController.UpdateProfileRequest(FirstName: "Alex", LastName: "Jansen");
+        var result = await controller.UpdateProfile(request);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_EmptyNames_ReturnsBadRequest()
+    {
+        var jwtService = new Infrastructure.Security.JwtTokenService(Infrastructure.Security.JwtTokenService.DefaultSecretKey);
+        var memberId = Guid.NewGuid();
+        var member = new Member
+        {
+            Id = memberId,
+            Email = "member@example.com",
+            DisplayName = string.Empty,
+            PasswordHash = "hash",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        var token = jwtService.GenerateToken(member);
+
+        var registerUseCase = new RegisterMemberUseCase(_members.Object, _hasher.Object);
+        var loginUseCase = new LoginMemberUseCase(_members.Object, _hasher.Object);
+        var controller = new AuthController(registerUseCase, loginUseCase, jwtService, _members.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.Request.Headers.Authorization = $"Bearer {token}";
+
+        var request = new AuthController.UpdateProfileRequest(FirstName: "   ", LastName: "   ");
+        var result = await controller.UpdateProfile(request);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
 }
