@@ -106,7 +106,7 @@ test.describe('INC-23: View Monthly Calendar Grid', () => {
     await page.getByTestId(`enter-dashboard-${club.id}`).click()
 
     // 5. On Overview page, verify Club Header and Calendar module
-    await expect(page.getByTestId('dashboard-club-name')).toHaveTextContent('Astronomy & Stargazing')
+    await expect(page.getByTestId('dashboard-club-name')).toHaveText('Astronomy & Stargazing')
     await expect(page.getByTestId('dashboard-calendar-btn')).toBeVisible()
 
     // 6. Navigate to Calendar via Overview module button
