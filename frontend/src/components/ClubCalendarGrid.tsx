@@ -201,7 +201,7 @@ export default function ClubCalendarGrid({
           <div className="inline-flex rounded-xl bg-aurora-elevated ring-1 ring-aurora-border p-0.5">
             <button
               type="button"
-              data-testid="calendar-prev-month-btn"
+              data-testid="calendar-prev-btn"
               onClick={handlePrevMonth}
               aria-label={t('calendar.prevMonth', 'Previous Month')}
               className="btn-tactile rounded-lg p-1.5 text-aurora-text-secondary hover:text-aurora-text hover:bg-aurora-surface cursor-pointer transition-colors"
@@ -212,7 +212,7 @@ export default function ClubCalendarGrid({
             </button>
             <button
               type="button"
-              data-testid="calendar-next-month-btn"
+              data-testid="calendar-next-btn"
               onClick={handleNextMonth}
               aria-label={t('calendar.nextMonth', 'Next Month')}
               className="btn-tactile rounded-lg p-1.5 text-aurora-text-secondary hover:text-aurora-text hover:bg-aurora-surface cursor-pointer transition-colors"
@@ -227,19 +227,20 @@ export default function ClubCalendarGrid({
 
       {/* Loading & Error States */}
       {isLoading && (
-        <div data-testid="calendar-loading" className="flex items-center justify-center py-20">
+        <div data-testid="calendar-loading-spinner" className="flex items-center justify-center py-20">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-aurora-primary border-r-transparent" />
         </div>
       )}
 
       {isError && (
-        <div data-testid="calendar-error" className="py-12 text-center">
+        <div data-testid="calendar-error-banner" className="py-12 text-center">
           <p className="text-sm font-medium text-red-400">
             {errorMessage || t('calendar.errorMessage', 'Failed to retrieve club events.')}
           </p>
           {onRetry && (
             <button
               type="button"
+              data-testid="calendar-retry-btn"
               onClick={onRetry}
               className="mt-4 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white hover:bg-aurora-primary-hover cursor-pointer"
             >
@@ -256,6 +257,7 @@ export default function ClubCalendarGrid({
             {weekdays.map((dayName, idx) => (
               <div
                 key={idx}
+                data-testid={`calendar-weekday-${idx}`}
                 className="text-xs font-semibold uppercase tracking-wider text-aurora-text-secondary py-1"
               >
                 {dayName}
@@ -326,7 +328,7 @@ export default function ClubCalendarGrid({
           {/* Month Empty State Notice */}
           {totalMonthEvents === 0 && (
             <div
-              data-testid="calendar-empty-state"
+              data-testid="calendar-empty-notice"
               className="mt-6 rounded-xl border border-dashed border-aurora-border p-6 text-center text-xs text-aurora-text-secondary"
             >
               <p className="font-semibold text-aurora-text">{t('calendar.emptyTitle', 'No events scheduled')}</p>
@@ -353,7 +355,7 @@ export default function ClubCalendarGrid({
                 </span>
                 <h3
                   id="event-dialog-title"
-                  data-testid="calendar-event-title"
+                  data-testid="calendar-modal-title"
                   className="mt-2 text-xl font-bold tracking-tight text-aurora-text"
                 >
                   {selectedEvent.title}
@@ -361,7 +363,7 @@ export default function ClubCalendarGrid({
               </div>
               <button
                 type="button"
-                data-testid="close-event-modal-btn"
+                data-testid="calendar-modal-close-btn"
                 onClick={() => setSelectedEvent(null)}
                 className="rounded-lg p-1 text-aurora-text-secondary hover:text-aurora-text cursor-pointer"
                 aria-label={t('calendar.eventDetails.close', 'Close')}
@@ -375,7 +377,7 @@ export default function ClubCalendarGrid({
                 <svg className="h-4 w-4 text-aurora-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span data-testid="calendar-event-time">
+                <span data-testid="calendar-modal-time">
                   {new Date(selectedEvent.startTimeUtc).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {formatTime(selectedEvent.startTimeUtc)} – {formatTime(selectedEvent.endTimeUtc)}
                 </span>
               </div>
@@ -386,7 +388,7 @@ export default function ClubCalendarGrid({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span data-testid="calendar-event-location">{selectedEvent.location}</span>
+                  <span data-testid="calendar-modal-location">{selectedEvent.location}</span>
                 </div>
               )}
 
@@ -395,7 +397,7 @@ export default function ClubCalendarGrid({
                   <p className="text-[11px] font-semibold text-aurora-text-muted uppercase tracking-wider mb-1">
                     {t('calendar.eventDetails.description', 'Description')}
                   </p>
-                  <p data-testid="calendar-event-description" className="text-aurora-text-secondary leading-relaxed">
+                  <p data-testid="calendar-modal-description" className="text-aurora-text-secondary leading-relaxed">
                     {selectedEvent.description}
                   </p>
                 </div>
@@ -405,6 +407,7 @@ export default function ClubCalendarGrid({
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
+                data-testid="calendar-modal-footer-close-btn"
                 onClick={() => setSelectedEvent(null)}
                 className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
               >

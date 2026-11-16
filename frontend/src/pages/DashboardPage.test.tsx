@@ -12,6 +12,7 @@ vi.mock('../lib/api', async () => {
     getMemberClubs: vi.fn(),
     getClubDetails: vi.fn(),
     getClubMembers: vi.fn(),
+    getClubEvents: vi.fn(),
   }
 })
 
@@ -52,6 +53,7 @@ describe('DashboardPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    window.location.hash = ''
     vi.mocked(api.getMemberClubs).mockResolvedValue([dummyClubAdmin, dummyClubMember])
     vi.mocked(api.getClubDetails).mockResolvedValue(dummyClubAdmin)
   })
@@ -315,5 +317,63 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByTestId('dashboard-access-denied')).toBeInTheDocument()
     expect(screen.getByText(/You do not have administrative access|Je hebt geen beheerdersrechten/i)).toBeInTheDocument()
+  })
+
+  it('navigates to calendar view when clicking Calendar button and displays calendar grid', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getClubEvents).mockResolvedValue([
+      {
+        id: 'evt-test-1',
+        clubId: 'club-alpha',
+        title: 'Weekly Robotics Meetup',
+        description: 'Building autonomous line-follower.',
+        location: 'Lab 1',
+        startTimeUtc: '2026-11-20T10:00:00Z',
+        endTimeUtc: '2026-11-20T12:00:00Z',
+        createdByMemberId: 'mem-100',
+        createdAtUtc: '2026-11-01T10:00:00Z',
+      },
+    ])
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubAdmin],
+      initialActiveClubId: 'club-alpha',
+    })
+
+    const calendarBtn = await screen.findByTestId('dashboard-calendar-btn')
+    await user.click(calendarBtn)
+
+    expect(await screen.findByTestId('calendar-page-heading')).toHaveTextContent(/Club Calendar|Clubkalender/i)
+    expect(screen.getByTestId('club-calendar-section')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-month-heading')).toBeInTheDocument()
+    expect(window.location.hash).toBe('#dashboard/club-alpha/calendar')
+
+    // Navigate back to overview
+    const backBtn = screen.getByTestId('calendar-back-to-dashboard-link')
+    await user.click(backBtn)
+
+    expect(await screen.findByTestId('dashboard-club-name')).toHaveTextContent('Leuven Robotics Club')
+    expect(window.location.hash).toBe('#dashboard/club-alpha')
+  })
+
+  it('allows regular Club Member to view calendar without access denied', async () => {
+    window.location.hash = '#dashboard/club-beta/calendar'
+    vi.mocked(api.getClubDetails).mockResolvedValue(dummyClubMember)
+    vi.mocked(api.getClubEvents).mockResolvedValue([])
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubMember],
+      initialActiveClubId: 'club-beta',
+    })
+
+    expect(await screen.findByTestId('calendar-page-heading')).toHaveTextContent(/Club Calendar|Clubkalender/i)
+    expect(screen.getByTestId('club-calendar-section')).toBeInTheDocument()
+    expect(screen.queryByTestId('dashboard-access-denied')).not.toBeInTheDocument()
   })
 })
