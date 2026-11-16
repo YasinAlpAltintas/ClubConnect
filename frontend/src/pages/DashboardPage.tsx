@@ -616,6 +616,10 @@ export default function DashboardPage({
             errorMessage={eventsError instanceof Error ? eventsError.message : undefined}
             onRetry={() => void refetchEvents()}
             clubName={currentClub?.name ?? ''}
+            clubId={currentClub?.id}
+            token={member.token}
+            isAdmin={currentClub?.role === 'Club Admin'}
+            onEventCreated={() => void refetchEvents()}
           />
         </div>
       ) : (
