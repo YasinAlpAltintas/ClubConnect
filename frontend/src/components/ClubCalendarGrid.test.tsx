@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import ClubCalendarGrid from './ClubCalendarGrid'
+import * as api from '../lib/api'
 import { type ClubEventDto } from '../lib/api'
 import '../i18n'
 
@@ -197,5 +198,164 @@ describe('ClubCalendarGrid', () => {
     )
 
     expect(screen.getByTestId('calendar-empty-notice')).toBeInTheDocument()
+  })
+
+  it('renders "+ New Event" button only when isAdmin is true', () => {
+    const { rerender } = render(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+      />
+    )
+
+    expect(screen.queryByTestId('calendar-new-event-btn')).not.toBeInTheDocument()
+
+    rerender(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+      />
+    )
+
+    expect(screen.getByTestId('calendar-new-event-btn')).toBeInTheDocument()
+  })
+
+  it('opens New Event modal when clicking "+ New Event" button and cancels cleanly', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+        token="token-xyz"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-new-event-btn'))
+    expect(screen.getByTestId('new-event-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('new-event-title-input')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('new-event-cancel-btn'))
+    expect(screen.queryByTestId('new-event-modal')).not.toBeInTheDocument()
+  })
+
+  it('opens New Event modal when clicking a date cell as admin with pre-filled date', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+        token="token-xyz"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-day-2026-11-20'))
+    expect(screen.getByTestId('new-event-modal')).toBeInTheDocument()
+
+    const startInput = screen.getByTestId('new-event-start-time-input') as HTMLInputElement
+    const endInput = screen.getByTestId('new-event-end-time-input') as HTMLInputElement
+
+    expect(startInput.value).toBe('2026-11-20T18:00')
+    expect(endInput.value).toBe('2026-11-20T20:00')
+  })
+
+  it('displays client-side validation error when title is missing or end time is before start time', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+        token="token-xyz"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-new-event-btn'))
+
+    // 1. Missing title
+    await user.click(screen.getByTestId('new-event-submit-btn'))
+    expect(screen.getByTestId('new-event-error')).toBeInTheDocument()
+    expect(screen.getByTestId('new-event-error')).toHaveTextContent(/Event title is required|Titel van evenement is verplicht/i)
+
+    // 2. Set title and set end time before start time
+    fireEvent.change(screen.getByTestId('new-event-title-input'), { target: { value: 'AI Summit' } })
+    const startInput = screen.getByTestId('new-event-start-time-input')
+    const endInput = screen.getByTestId('new-event-end-time-input')
+
+    fireEvent.change(startInput, { target: { value: '2026-11-20T19:00' } })
+    fireEvent.change(endInput, { target: { value: '2026-11-20T18:00' } })
+
+    await user.click(screen.getByTestId('new-event-submit-btn'))
+    expect(screen.getByTestId('new-event-error')).toBeInTheDocument()
+    expect(screen.getByTestId('new-event-error')).toHaveTextContent(/End time must be after start time|Eindtijd moet na de starttijd liggen/i)
+  })
+
+  it('submits valid event payload and calls onEventCreated on success', async () => {
+    const user = userEvent.setup()
+    const onEventCreated = vi.fn()
+
+    const createdMockEvent: ClubEventDto = {
+      id: 'new-evt-999',
+      clubId: 'club-123',
+      title: 'Hackathon 2026',
+      description: '24-hour coding challenge',
+      location: 'Main Auditorium',
+      startTimeUtc: '2026-11-20T18:00:00.000Z',
+      endTimeUtc: '2026-11-20T21:00:00.000Z',
+      createdByMemberId: 'mem-admin',
+      createdAtUtc: '2026-11-16T12:00:00.000Z',
+    }
+
+    const createEventFn = vi.fn().mockResolvedValue(createdMockEvent)
+
+    render(
+      <ClubCalendarGrid
+        events={[]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+        token="token-xyz"
+        onEventCreated={onEventCreated}
+        createEventFn={createEventFn}
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-day-2026-11-20'))
+
+    fireEvent.change(screen.getByTestId('new-event-title-input'), { target: { value: 'Hackathon 2026' } })
+    fireEvent.change(screen.getByTestId('new-event-description-input'), { target: { value: '24-hour coding challenge' } })
+    fireEvent.change(screen.getByTestId('new-event-location-input'), { target: { value: 'Main Auditorium' } })
+
+    await user.click(screen.getByTestId('new-event-submit-btn'))
+
+    expect(createEventFn).toHaveBeenCalledTimes(1)
+    expect(createEventFn).toHaveBeenCalledWith(
+      'club-123',
+      expect.objectContaining({
+        title: 'Hackathon 2026',
+        description: '24-hour coding challenge',
+        location: 'Main Auditorium',
+      }),
+      'token-xyz'
+    )
+
+    expect(screen.queryByTestId('new-event-modal')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-success-banner')).toHaveTextContent(/Hackathon 2026/i)
+    expect(onEventCreated).toHaveBeenCalledWith(createdMockEvent)
   })
 })

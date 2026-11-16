@@ -15,6 +15,7 @@ export interface ClubCalendarGridProps {
   initialDate?: Date
   onSelectEvent?: (event: ClubEventDto) => void
   onEventCreated?: (event: ClubEventDto) => void
+  createEventFn?: typeof createClubEvent
 }
 
 export default function ClubCalendarGrid({
@@ -30,6 +31,7 @@ export default function ClubCalendarGrid({
   initialDate,
   onSelectEvent,
   onEventCreated,
+  createEventFn = createClubEvent,
 }: ClubCalendarGridProps) {
   const { t, i18n } = useTranslation()
   const [currentDate, setCurrentDate] = useState<Date>(() => initialDate ?? new Date())
@@ -118,7 +120,7 @@ export default function ClubCalendarGrid({
 
     setIsSubmitting(true)
     try {
-      const created = await createClubEvent(
+      const created = await createEventFn(
         clubId,
         {
           title: trimmedTitle,
@@ -590,7 +592,7 @@ export default function ClubCalendarGrid({
               </div>
             )}
 
-            <form onSubmit={handleCreateEventSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleCreateEventSubmit} noValidate className="mt-5 space-y-4">
               {/* Event Title */}
               <div>
                 <label
