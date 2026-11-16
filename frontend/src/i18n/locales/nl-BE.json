@@ -232,5 +232,37 @@
       "copied": "Gekopieerd naar klembord!",
       "adminOnlyBadge": "Alleen beheerder"
     }
+  },
+  "calendar": {
+    "title": "Clubkalender",
+    "subtitle": "Maandelijks schema en evenementen voor {{clubName}}.",
+    "backToDashboard": "Terug naar Dashboard",
+    "navButton": "Kalender",
+    "viewCalendar": "Bekijk Kalender",
+    "openCalendar": "Open Kalender",
+    "today": "Vandaag",
+    "prevMonth": "Vorige Maand",
+    "nextMonth": "Volgende Maand",
+    "eventCount_one": "1 evenement deze maand",
+    "eventCount_other": "{{count}} evenementen deze maand",
+    "eventCount": "{{count}} evenementen deze maand",
+    "emptyTitle": "Geen evenementen gepland",
+    "emptyDesc": "Er zijn geen activiteiten of bijeenkomsten gepland voor deze maand.",
+    "weekdays": {
+      "mon": "Ma",
+      "tue": "Di",
+      "wed": "Wo",
+      "thu": "Do",
+      "fri": "Vr",
+      "sat": "Za",
+      "sun": "Zo"
+    },
+    "eventDetails": {
+      "title": "Evenementdetails",
+      "location": "Locatie",
+      "time": "Tijdstip",
+      "description": "Beschrijving",
+      "close": "Sluiten"
+    }
   }
 }

@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { type AuthenticatedMember } from './LobbyPage'
-import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole, removeClubMember } from '../lib/api'
+import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole, removeClubMember, getClubEvents } from '../lib/api'
 import { useActiveClub } from '../lib/useActiveClub'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ClubMembersTable from '../components/ClubMembersTable'
+import ClubCalendarGrid from '../components/ClubCalendarGrid'
 import InviteCodeCard from '../components/InviteCodeCard'
 import ThemeToggle from '../components/ThemeToggle'
 import { type SupportedLanguage } from '../i18n'
@@ -30,14 +31,19 @@ export default function DashboardPage({
   const { t, i18n } = useTranslation()
   const [selectedClubId, setSelectedClubId] = useState<string | null | undefined>(initialActiveClubId)
 
-  const getSubViewFromHash = (): 'overview' | 'members' => {
-    if (typeof window !== 'undefined' && window.location.hash.includes('/members')) {
-      return 'members'
+  const getSubViewFromHash = (): 'overview' | 'members' | 'calendar' => {
+    if (typeof window !== 'undefined') {
+      if (window.location.hash.includes('/members')) {
+        return 'members'
+      }
+      if (window.location.hash.includes('/calendar')) {
+        return 'calendar'
+      }
     }
     return 'overview'
   }
 
-  const [subView, setSubView] = useState<'overview' | 'members'>(getSubViewFromHash)
+  const [subView, setSubView] = useState<'overview' | 'members' | 'calendar'>(getSubViewFromHash)
   const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
   const [promoteNotification, setPromoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
@@ -124,12 +130,38 @@ export default function DashboardPage({
     }
   }, [membersError, onSessionExpired])
 
-  const navigateToSubView = (nextView: 'overview' | 'members') => {
+  const {
+    data: clubEvents = [],
+    isLoading: isLoadingEvents,
+    isError: isEventsError,
+    error: eventsError,
+    refetch: refetchEvents,
+  } = useQuery({
+    queryKey: ['clubEvents', targetClubId, member.token],
+    queryFn: () => getClubEvents(targetClubId!, undefined, member.token),
+    enabled: !!targetClubId && !!member.token && subView === 'calendar',
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (eventsError) {
+      const status = (eventsError as { status?: number }).status
+      const msg = eventsError instanceof Error ? eventsError.message : ''
+      if (status === 401 || msg.includes('401')) {
+        onSessionExpired?.()
+      }
+    }
+  }, [eventsError, onSessionExpired])
+
+  const navigateToSubView = (nextView: 'overview' | 'members' | 'calendar') => {
     setSubView(nextView)
     if (typeof window !== 'undefined' && targetClubId) {
-      window.location.hash = nextView === 'members'
-        ? `#dashboard/${targetClubId}/members`
-        : `#dashboard/${targetClubId}`
+      window.location.hash =
+        nextView === 'members'
+          ? `#dashboard/${targetClubId}/members`
+          : nextView === 'calendar'
+          ? `#dashboard/${targetClubId}/calendar`
+          : `#dashboard/${targetClubId}`
     }
   }
 
@@ -137,17 +169,23 @@ export default function DashboardPage({
     setSelectedClubId(clubId)
     setActiveClubId(clubId)
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
-      window.location.hash = subView === 'members'
-        ? `#dashboard/${clubId}/members`
-        : `#dashboard/${clubId}`
+      window.location.hash =
+        subView === 'members'
+          ? `#dashboard/${clubId}/members`
+          : subView === 'calendar'
+          ? `#dashboard/${clubId}/calendar`
+          : `#dashboard/${clubId}`
     }
   }
 
   useEffect(() => {
     if (targetClubId && typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
-      const expectedHash = subView === 'members'
-        ? `#dashboard/${targetClubId}/members`
-        : `#dashboard/${targetClubId}`
+      const expectedHash =
+        subView === 'members'
+          ? `#dashboard/${targetClubId}/members`
+          : subView === 'calendar'
+          ? `#dashboard/${targetClubId}/calendar`
+          : `#dashboard/${targetClubId}`
       if (window.location.hash !== expectedHash) {
         window.location.hash = expectedHash
       }
@@ -359,16 +397,37 @@ export default function DashboardPage({
             >
               {t('members.backToDashboard')}
             </button>
-          ) : isClubAdmin ? (
+          ) : subView === 'calendar' ? (
             <button
               type="button"
-              data-testid="dashboard-members-nav-btn"
-              onClick={() => navigateToSubView('members')}
-              className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
+              data-testid="calendar-back-to-dashboard-btn"
+              onClick={() => navigateToSubView('overview')}
+              className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-primary ring-1 ring-aurora-primary/30 hover:bg-aurora-primary/10 cursor-pointer transition-colors"
             >
-              {t('members.navButton')}
+              {t('calendar.backToDashboard')}
             </button>
-          ) : null}
+          ) : (
+            <>
+              <button
+                type="button"
+                data-testid="dashboard-calendar-nav-btn"
+                onClick={() => navigateToSubView('calendar')}
+                className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
+              >
+                {t('calendar.navButton')}
+              </button>
+              {isClubAdmin && (
+                <button
+                  type="button"
+                  data-testid="dashboard-members-nav-btn"
+                  onClick={() => navigateToSubView('members')}
+                  className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
+                >
+                  {t('members.navButton')}
+                </button>
+              )}
+            </>
+          )}
           <button
             type="button"
             data-testid="dashboard-language-toggle"
@@ -528,6 +587,48 @@ export default function DashboardPage({
             isDemotingMemberId={demotingMemberId}
           />
         </div>
+      ) : subView === 'calendar' ? (
+        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6" data-testid="calendar-page">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  data-testid="calendar-back-to-dashboard-link"
+                  onClick={() => navigateToSubView('overview')}
+                  className="inline-flex items-center text-xs font-semibold text-aurora-primary hover:text-aurora-muted cursor-pointer transition-colors"
+                >
+                  ← {t('calendar.backToDashboard')}
+                </button>
+              </div>
+              <div className="mt-2 flex items-center space-x-3">
+                <h1
+                  data-testid="calendar-page-heading"
+                  className="text-2xl font-bold tracking-tight text-aurora-text sm:text-3xl"
+                >
+                  {t('calendar.title')}
+                </h1>
+              </div>
+              {currentClub && (
+                <p
+                  data-testid="calendar-page-subtitle"
+                  className="mt-1 text-xs text-aurora-text-secondary"
+                >
+                  {t('calendar.subtitle', { clubName: currentClub.name })}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <ClubCalendarGrid
+            events={clubEvents}
+            isLoading={isLoadingEvents}
+            isError={isEventsError}
+            errorMessage={eventsError instanceof Error ? eventsError.message : undefined}
+            onRetry={() => void refetchEvents()}
+            clubName={currentClub?.name ?? ''}
+          />
+        </div>
       ) : (
         <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
           {currentClub && (
@@ -569,21 +670,32 @@ export default function DashboardPage({
                   )}
                 </div>
 
-                {isClubAdmin && (
-                  <div className="flex items-center space-x-3 sm:self-start">
+                <div className="flex items-center space-x-3 sm:self-start">
+                  <button
+                    type="button"
+                    data-testid="dashboard-calendar-header-btn"
+                    onClick={() => navigateToSubView('calendar')}
+                    className="btn-tactile inline-flex items-center space-x-2 rounded-xl bg-aurora-primary/10 px-3.5 py-2 text-xs font-semibold text-aurora-primary ring-1 ring-aurora-primary/25 hover:bg-aurora-primary/20 transition-colors cursor-pointer"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>{t('calendar.navButton')}</span>
+                  </button>
+                  {isClubAdmin && (
                     <button
                       type="button"
                       data-testid="dashboard-members-btn"
                       onClick={() => navigateToSubView('members')}
-                      className="btn-tactile inline-flex items-center space-x-2 rounded-xl bg-aurora-primary/10 px-3.5 py-2 text-xs font-semibold text-aurora-primary ring-1 ring-aurora-primary/25 hover:bg-aurora-primary/20 transition-colors cursor-pointer"
+                      className="btn-tactile inline-flex items-center space-x-2 rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border transition-colors cursor-pointer"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
                       <span>{t('members.title')}</span>
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {currentClub.role === 'Club Admin' && currentClub.inviteCode && (
@@ -618,9 +730,19 @@ export default function DashboardPage({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
                     </div>
-                    <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-text-muted ring-1 ring-aurora-border">
-                      {t('dashboard.modules.comingSoon')}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-text-muted ring-1 ring-aurora-border">
+                        {t('dashboard.modules.comingSoon')}
+                      </span>
+                      <button
+                        type="button"
+                        data-testid="dashboard-calendar-btn"
+                        onClick={() => navigateToSubView('calendar')}
+                        className="btn-tactile rounded-full bg-aurora-primary/10 px-2.5 py-1 text-[11px] font-semibold text-aurora-primary ring-1 ring-aurora-primary/25 hover:bg-aurora-primary/20 cursor-pointer transition-colors"
+                      >
+                        {t('calendar.openCalendar')} →
+                      </button>
+                    </div>
                   </div>
                   <h3 className="mt-4 font-semibold text-aurora-text">
                     {t('dashboard.modules.calendarTitle')}
@@ -628,6 +750,16 @@ export default function DashboardPage({
                   <p className="mt-1 text-xs text-aurora-text-secondary leading-relaxed">
                     {t('dashboard.modules.calendarDesc')}
                   </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-aurora-border/60">
+                  <button
+                    type="button"
+                    data-testid="dashboard-open-calendar-action"
+                    onClick={() => navigateToSubView('calendar')}
+                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-primary hover:text-white cursor-pointer transition-all"
+                  >
+                    {t('calendar.openCalendar')}
+                  </button>
                 </div>
               </article>
 

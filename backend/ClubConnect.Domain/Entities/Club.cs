@@ -22,4 +22,7 @@ public class Club
 
     /// <summary>Invite codes generated for this club.</summary>
     public ICollection<ClubInvite> Invites { get; set; } = new List<ClubInvite>();
+
+    /// <summary>Scheduled events belonging to this club.</summary>
+    public ICollection<ClubEvent> Events { get; set; } = new List<ClubEvent>();
 }

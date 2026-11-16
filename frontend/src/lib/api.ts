@@ -380,6 +380,46 @@ export async function removeClubMember(
   }
 }
 
+export interface ClubEventDto {
+  id: string
+  clubId: string
+  title: string
+  description?: string | null
+  location?: string | null
+  startTimeUtc: string
+  endTimeUtc: string
+  createdByMemberId: string
+  createdAtUtc: string
+}
+
+export async function getClubEvents(
+  clubId: string,
+  options?: { year?: number; month?: number },
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubEventDto[]> {
+  const queryParams = new URLSearchParams()
+  if (options?.year) queryParams.set('year', String(options.year))
+  if (options?.month) queryParams.set('month', String(options.month))
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
+  const res = await fetchFn(`/api/clubs/${clubId}/events${queryString}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const error = new Error(`Failed to fetch club events (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubEventDto[]
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string

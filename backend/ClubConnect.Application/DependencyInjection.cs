@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<GetClubMembersUseCase>();
         services.AddScoped<UpdateMemberRoleUseCase>();
         services.AddScoped<RemoveClubMemberUseCase>();
+        services.AddScoped<GetClubEventsUseCase>();
         return services;
     }
 }
