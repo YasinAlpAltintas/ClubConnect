@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { type AuthenticatedMember } from './LobbyPage'
-import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole } from '../lib/api'
+import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole, removeClubMember } from '../lib/api'
 import { useActiveClub } from '../lib/useActiveClub'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ClubMembersTable from '../components/ClubMembersTable'
@@ -40,6 +40,8 @@ export default function DashboardPage({
   const [subView, setSubView] = useState<'overview' | 'members'>(getSubViewFromHash)
   const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
   const [promoteNotification, setPromoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [removeNotification, setRemoveNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     function handleHashChange() {
@@ -176,6 +178,30 @@ export default function DashboardPage({
       setTimeout(() => setPromoteNotification(null), 4000)
     } finally {
       setPromotingMemberId(null)
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (!targetClubId || removingMemberId) return
+    setRemovingMemberId(memberId)
+    setRemoveNotification(null)
+
+    try {
+      await removeClubMember(targetClubId, memberId, member.token)
+      await refetchMembers()
+      setRemoveNotification({
+        type: 'success',
+        message: t('members.actions.removeSuccess', 'Member removed successfully.'),
+      })
+      setTimeout(() => setRemoveNotification(null), 4000)
+    } catch (err) {
+      setRemoveNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : t('members.actions.removeError', 'Failed to remove member.'),
+      })
+      setTimeout(() => setRemoveNotification(null), 4000)
+    } finally {
+      setRemovingMemberId(null)
     }
   }
 
@@ -418,6 +444,27 @@ export default function DashboardPage({
             </div>
           )}
 
+          {removeNotification && (
+            <div
+              data-testid={removeNotification.type === 'success' ? 'remove-success-alert' : 'remove-error-alert'}
+              className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
+                removeNotification.type === 'success'
+                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
+                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+              }`}
+              role="alert"
+            >
+              <span>{removeNotification.message}</span>
+              <button
+                type="button"
+                onClick={() => setRemoveNotification(null)}
+                className="ml-3 text-xs opacity-75 hover:opacity-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <ClubMembersTable
             members={clubMembers}
             isLoading={isLoadingMembers}
@@ -425,8 +472,11 @@ export default function DashboardPage({
             errorMessage={membersError instanceof Error ? membersError.message : undefined}
             onRetry={() => void refetchMembers()}
             isClubAdmin={isClubAdmin}
+            currentMemberId={member.memberId}
             onPromoteMember={handlePromoteMember}
             isPromotingMemberId={promotingMemberId}
+            onRemoveMember={handleRemoveMember}
+            isRemovingMemberId={removingMemberId}
           />
         </div>
       ) : (
