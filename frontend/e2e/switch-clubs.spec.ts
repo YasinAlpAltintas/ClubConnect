@@ -179,9 +179,8 @@ test.describe('INC-14: Switch Between Clubs', () => {
     await page.fill('#password', password)
     await page.click('button[type="submit"]')
 
-    // Single club indicator visible, but interactive dropdown trigger is NOT present
-    await expect(page.getByTestId('club-switcher-single')).toBeVisible()
-    await expect(page.getByTestId('club-switcher-single')).toContainText('Sole Club Alpha')
+    // Single club membership does not clutter header with redundant single indicator or dropdown trigger
+    await expect(page.getByTestId('club-switcher-single')).not.toBeVisible()
     await expect(page.getByTestId('club-switcher-trigger')).not.toBeVisible()
 
     // Log out (first matching logout button in header)

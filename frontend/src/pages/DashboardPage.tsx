@@ -9,7 +9,7 @@ import ClubMembersTable from '../components/ClubMembersTable'
 import ClubCalendarGrid from '../components/ClubCalendarGrid'
 import InviteCodeCard from '../components/InviteCodeCard'
 import ThemeToggle from '../components/ThemeToggle'
-import { type SupportedLanguage } from '../i18n'
+import LanguageToggle from '../components/LanguageToggle'
 
 export interface DashboardPageProps {
   member: AuthenticatedMember
@@ -28,7 +28,7 @@ export default function DashboardPage({
   initialActiveClubId,
   initialClubs,
 }: DashboardPageProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [selectedClubId, setSelectedClubId] = useState<string | null | undefined>(initialActiveClubId)
 
   const getSubViewFromHash = (): 'overview' | 'members' | 'calendar' => {
@@ -191,11 +191,6 @@ export default function DashboardPage({
       }
     }
   }, [targetClubId, subView])
-
-  function toggleLanguage() {
-    const next: SupportedLanguage = i18n.language === 'en' ? 'nl-BE' : 'en'
-    void i18n.changeLanguage(next)
-  }
 
   async function handlePromoteMember(memberId: string) {
     if (!targetClubId || promotingMemberId) return
@@ -377,13 +372,22 @@ export default function DashboardPage({
           <span className="text-xl font-bold tracking-tight text-aurora-primary">
             {t('app.name')}
           </span>
-          <span className="hidden sm:inline-flex items-center rounded-full bg-aurora-primary/10 px-2.5 py-0.5 text-xs font-medium text-aurora-muted ring-1 ring-aurora-primary/20">
-            {t('dashboard.badge')}
-          </span>
+          <button
+            type="button"
+            data-testid="back-to-lobby-btn"
+            onClick={onNavigateToLobby}
+            className="btn-tactile inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>{t('dashboard.backToLobby')}</span>
+          </button>
           <ClubSwitcherDropdown
             clubs={clubs}
             activeClubId={targetClubId}
             onSelectClub={handleSelectClub}
+            hideSingleIndicator={true}
           />
         </div>
         <div className="flex items-center space-x-3">
@@ -428,22 +432,7 @@ export default function DashboardPage({
               )}
             </>
           )}
-          <button
-            type="button"
-            data-testid="dashboard-language-toggle"
-            onClick={toggleLanguage}
-            className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-          >
-            {t('header.languageToggle')}
-          </button>
-          <button
-            type="button"
-            data-testid="back-to-lobby-btn"
-            onClick={onNavigateToLobby}
-            className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-          >
-            {t('dashboard.backToLobby')}
-          </button>
+          <LanguageToggle data-testid="dashboard-language-toggle" />
           <button
             type="button"
             data-testid="dashboard-logout-btn"

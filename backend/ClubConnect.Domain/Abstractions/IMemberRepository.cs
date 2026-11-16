@@ -16,4 +16,7 @@ public interface IMemberRepository
 
     /// <summary>Returns the member with the given <paramref name="id"/>, or null.</summary>
     Task<Member?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates the display name of the member with the given <paramref name="id"/>.</summary>
+    Task<Member?> UpdateDisplayNameAsync(Guid id, string displayName, CancellationToken cancellationToken = default);
 }

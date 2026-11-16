@@ -72,9 +72,11 @@
   },
   "lobby": {
     "title": "Club Lobby",
-    "welcome": "Welkom terug, {{email}}!",
+    "welcome": "Welkom terug, {{name}}!",
+    "welcomeWithEmail": "Welkom terug, {{email}}!",
     "memberId": "Lid ID",
-    "subtitle": "Je bent ingelogd op ClubConnect.",
+    "connected": "Verbonden",
+    "subtitle": "",
     "logout": "Uitloggen",
     "myClubs": "Mijn Clubs",
     "loading": "Je clubs worden geladen…",
@@ -263,6 +265,20 @@
       "time": "Tijdstip",
       "description": "Beschrijving",
       "close": "Sluiten"
+    }
+  },
+  "onboarding": {
+    "title": "Welkom bij ClubConnect!",
+    "subtitle": "Vul je voornaam en achternaam in om je profiel te voltooien.",
+    "firstName": "Voornaam",
+    "firstNamePlaceholder": "Bijv. Alex",
+    "lastName": "Achternaam",
+    "lastNamePlaceholder": "Bijv. Jansen",
+    "submit": "Opslaan en doorgaan",
+    "submitting": "Bezig met opslaan…",
+    "errors": {
+      "firstNameRequired": "Vul je voornaam in.",
+      "lastNameRequired": "Vul je achternaam in."
     }
   }
 }

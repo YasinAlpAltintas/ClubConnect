@@ -619,3 +619,49 @@ export async function joinClub(
     role: data.role,
   }
 }
+
+export interface UpdateProfileRequest {
+  firstName?: string
+  lastName?: string
+  displayName?: string
+}
+
+export async function updateMemberProfile(
+  token: string,
+  request: UpdateProfileRequest,
+  fetchFn: typeof fetch = fetch,
+): Promise<LoginSuccessResponse> {
+  let response: Response
+  try {
+    response = await fetchFn('/api/auth/profile', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new Error('Network error while updating profile.')
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    payload = undefined
+  }
+
+  if (!response.ok) {
+    const errorMsg = extractErrorString(payload) || `Error ${response.status}`
+    throw new Error(errorMsg)
+  }
+
+  const data = payload as LoginSuccessResponse
+  return {
+    memberId: data.memberId,
+    email: data.email,
+    displayName: data.displayName,
+    token: data.token,
+  }
+}

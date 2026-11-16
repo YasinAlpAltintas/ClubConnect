@@ -193,10 +193,8 @@ describe('App navigation flows', () => {
 
     expect(screen.getByRole('heading', { name: 'Club Lobby' })).toBeInTheDocument()
 
-    const logoutButtons = screen.getAllByRole('button', { name: 'Log out' })
-    expect(logoutButtons.length).toBe(2)
-    // Click the card body logout button (second button)
-    await user.click(logoutButtons[1])
+    const logoutBtn = screen.getByRole('button', { name: 'Log out' })
+    await user.click(logoutBtn)
 
     expect(await screen.findByRole('heading', { name: 'Log in to your account' })).toBeInTheDocument()
     expect(mockedLogout).toHaveBeenCalledWith(validFutureToken)

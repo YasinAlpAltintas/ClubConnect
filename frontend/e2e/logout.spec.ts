@@ -45,8 +45,8 @@ test.describe('INC-9: Member Logout Session Flow', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)
   })
 
-  test('safely logs out via lobby card body button', async ({ page, request }) => {
-    const email = `inc9-card-logout-${Date.now()}@example.com`
+  test('safely logs out via lobby header logout button', async ({ page, request }) => {
+    const email = `inc9-header-logout-${Date.now()}@example.com`
     const password = 'Passw0rd123!'
 
     // 1. Register account
@@ -61,9 +61,9 @@ test.describe('INC-9: Member Logout Session Flow', () => {
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Club Lobby/)
 
-    // 3. Click card body Logout button
-    const bodyLogout = page.locator('section').getByRole('button', { name: /Log out|Uitloggen/ })
-    await bodyLogout.click()
+    // 3. Click header Logout button
+    const headerLogout = page.getByRole('button', { name: /Log out|Uitloggen/ }).first()
+    await headerLogout.click()
 
     // 4. Confirms safe redirection to Login screen
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Log in to your account|Inloggen op je account/)

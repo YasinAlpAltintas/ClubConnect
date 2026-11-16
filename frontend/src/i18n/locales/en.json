@@ -72,9 +72,11 @@
   },
   "lobby": {
     "title": "Club Lobby",
-    "welcome": "Welcome back, {{email}}!",
+    "welcome": "Welcome back, {{name}}!",
+    "welcomeWithEmail": "Welcome back, {{email}}!",
     "memberId": "Member ID",
-    "subtitle": "You are logged in to ClubConnect.",
+    "connected": "Connected",
+    "subtitle": "",
     "logout": "Log out",
     "myClubs": "My Clubs",
     "loading": "Loading your clubs…",
@@ -263,6 +265,20 @@
       "time": "Time",
       "description": "Description",
       "close": "Close"
+    }
+  },
+  "onboarding": {
+    "title": "Welcome to ClubConnect!",
+    "subtitle": "Enter your first and last name to complete your profile.",
+    "firstName": "First name",
+    "firstNamePlaceholder": "e.g. Alex",
+    "lastName": "Last name",
+    "lastNamePlaceholder": "e.g. Jansen",
+    "submit": "Save and continue",
+    "submitting": "Saving…",
+    "errors": {
+      "firstNameRequired": "First name is required.",
+      "lastNameRequired": "Last name is required."
     }
   }
 }

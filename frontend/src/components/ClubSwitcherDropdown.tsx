@@ -7,12 +7,14 @@ export interface ClubSwitcherDropdownProps {
   activeClubId: string | null
   onSelectClub: (clubId: string) => void
   onClearActiveClub?: () => void
+  hideSingleIndicator?: boolean
 }
 
 export default function ClubSwitcherDropdown({
   clubs,
   activeClubId,
   onSelectClub,
+  hideSingleIndicator = false,
 }: ClubSwitcherDropdownProps) {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
@@ -54,6 +56,9 @@ export default function ClubSwitcherDropdown({
 
   // If user belongs to only 1 club, show clean active indicator without dropdown complexity
   if (clubs.length === 1 && activeClub) {
+    if (hideSingleIndicator) {
+      return null
+    }
     return (
       <div
         data-testid="single-club-indicator"
