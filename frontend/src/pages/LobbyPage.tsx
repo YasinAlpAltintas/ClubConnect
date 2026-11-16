@@ -7,6 +7,7 @@ import {
   CreateClubApiException,
   joinClub,
   JoinClubApiException,
+  updateMemberProfile,
   type ClubDto,
 } from '../lib/api'
 import { createClubSchema } from '../schemas/club'
@@ -14,7 +15,6 @@ import { inviteCodeSchema } from '../schemas/invite'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ThemeToggle from '../components/ThemeToggle'
 import LanguageToggle from '../components/LanguageToggle'
-import OnboardingNameModal from '../components/OnboardingNameModal'
 import { setStoredToken } from '../lib/jwt'
 import { useActiveClub } from '../lib/useActiveClub'
 
@@ -77,6 +77,36 @@ export default function LobbyPage({
     }))
     if (newToken) {
       setStoredToken(newToken)
+    }
+  }
+
+  // First-time onboarding state
+  const [onboardingFirstName, setOnboardingFirstName] = useState('')
+  const [onboardingLastName, setOnboardingLastName] = useState('')
+  const [onboardingError, setOnboardingError] = useState<string | null>(null)
+  const [isOnboardingSubmitting, setIsOnboardingSubmitting] = useState(false)
+
+  async function handleInlineSaveName(e: React.FormEvent) {
+    e.preventDefault()
+    setOnboardingError(null)
+    const first = onboardingFirstName.trim()
+    const last = onboardingLastName.trim()
+    if (!first || !last) {
+      setOnboardingError(t('onboarding.errors.firstNameRequired'))
+      return
+    }
+    if (!currentMember.token) return
+    setIsOnboardingSubmitting(true)
+    try {
+      const response = await updateMemberProfile(currentMember.token, {
+        firstName: first,
+        lastName: last,
+      })
+      handleProfileUpdated(response.displayName || `${first} ${last}`, response.token)
+    } catch (err) {
+      setOnboardingError(err instanceof Error ? err.message : 'Error updating profile')
+    } finally {
+      setIsOnboardingSubmitting(false)
     }
   }
 
@@ -323,6 +353,53 @@ export default function LobbyPage({
               </div>
             )}
           </div>
+
+          {/* First-time onboarding: Enter First Name & Surname */}
+          {!currentMember.displayName && (
+            <div data-testid="onboarding-name-prompt" className="mt-5 rounded-xl bg-aurora-elevated p-4 sm:p-5 ring-1 ring-aurora-border">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-aurora-text flex items-center gap-2">
+                    <span>👋</span> {t('onboarding.title')}
+                  </h2>
+                  <p className="text-xs text-aurora-text-secondary mt-1">
+                    {t('onboarding.subtitle')}
+                  </p>
+                </div>
+              </div>
+
+              {onboardingError && (
+                <p className="mt-2 text-xs text-red-400 font-medium">{onboardingError}</p>
+              )}
+
+              <form onSubmit={handleInlineSaveName} className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  data-testid="onboarding-first-name"
+                  placeholder={t('onboarding.firstName')}
+                  value={onboardingFirstName}
+                  onChange={(e) => setOnboardingFirstName(e.target.value)}
+                  className="rounded-xl bg-aurora-surface px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                />
+                <input
+                  type="text"
+                  data-testid="onboarding-last-name"
+                  placeholder={t('onboarding.lastName')}
+                  value={onboardingLastName}
+                  onChange={(e) => setOnboardingLastName(e.target.value)}
+                  className="rounded-xl bg-aurora-surface px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  data-testid="onboarding-submit-btn"
+                  disabled={isOnboardingSubmitting}
+                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all shrink-0"
+                >
+                  {isOnboardingSubmitting ? t('onboarding.submitting') : t('onboarding.submit')}
+                </button>
+              </form>
+            </div>
+          )}
         </section>
 
         {/* Active Club Workspace Banner */}
@@ -949,15 +1026,6 @@ export default function LobbyPage({
         </span>
         <span className="text-aurora-text-secondary">{t('lobby.connected', 'Connected')}</span>
       </div>
-
-      {/* Onboarding Name & Surname Modal */}
-      {currentMember.token && (
-        <OnboardingNameModal
-          isOpen={!currentMember.displayName || !currentMember.displayName.trim()}
-          token={currentMember.token}
-          onProfileUpdated={handleProfileUpdated}
-        />
-      )}
     </main>
   )
 }
