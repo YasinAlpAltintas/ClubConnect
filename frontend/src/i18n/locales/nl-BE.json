@@ -265,6 +265,32 @@
       "time": "Tijdstip",
       "description": "Beschrijving",
       "close": "Sluiten"
+    },
+    "newEvent": {
+      "button": "Nieuw Evenement",
+      "title": "Nieuw Evenement Inplannen",
+      "subtitle": "Voeg een nieuwe activiteit of bijeenkomst toe aan de clubkalender.",
+      "fields": {
+        "title": "Titel van evenement",
+        "titlePlaceholder": "bijv. Wekelijkse Strategievergadering",
+        "description": "Beschrijving",
+        "descriptionPlaceholder": "Optionele details, agenda of benodigdheden...",
+        "location": "Locatie / Lokaal",
+        "locationPlaceholder": "bijv. Campus Gebouw B, Lokaal 2.14",
+        "startTime": "Startdatum & tijd",
+        "endTime": "Einddatum & tijd"
+      },
+      "submit": "Evenement Inplannen",
+      "submitting": "Bezig met inplannen…",
+      "cancel": "Annuleren",
+      "clickDatePrompt": "Klik op een datum om in te plannen",
+      "successNotice": "Evenement \"{{title}}\" succesvol ingepland!",
+      "errors": {
+        "titleRequired": "Titel van evenement is verplicht.",
+        "titleTooLong": "Titel mag niet langer zijn dan 100 tekens.",
+        "datesInvalid": "Eindtijd moet na de starttijd liggen.",
+        "generic": "Kon evenement niet inplannen. Probeer het opnieuw."
+      }
     }
   },
   "onboarding": {

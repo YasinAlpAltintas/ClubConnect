@@ -265,6 +265,32 @@
       "time": "Time",
       "description": "Description",
       "close": "Close"
+    },
+    "newEvent": {
+      "button": "New Event",
+      "title": "Schedule New Event",
+      "subtitle": "Add a new activity or gathering to the club calendar.",
+      "fields": {
+        "title": "Event Title",
+        "titlePlaceholder": "e.g. Weekly Strategy Meeting",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional details, agenda, or materials to bring...",
+        "location": "Location / Room",
+        "locationPlaceholder": "e.g. Campus Building B, Room 2.14",
+        "startTime": "Start Date & Time",
+        "endTime": "End Date & Time"
+      },
+      "submit": "Schedule Event",
+      "submitting": "Scheduling…",
+      "cancel": "Cancel",
+      "clickDatePrompt": "Click date to schedule",
+      "successNotice": "Event \"{{title}}\" successfully scheduled!",
+      "errors": {
+        "titleRequired": "Event title is required.",
+        "titleTooLong": "Event title cannot exceed 100 characters.",
+        "datesInvalid": "End time must be after start time.",
+        "generic": "Failed to schedule event. Please try again."
+      }
     }
   },
   "onboarding": {
