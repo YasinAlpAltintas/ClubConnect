@@ -686,4 +686,108 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
         var regularMembers = members.EnumerateArray().Where(m => m.GetProperty("role").GetString() == "Club Member").ToList();
         Assert.Equal(2, regularMembers.Count);
     }
+
+    [Fact]
+    public async Task GetClubEvents_WithoutToken_Returns401Unauthorized()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{Guid.NewGuid()}/events");
+        using var response = await _fixture.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubEvents_WhenClubDoesNotExist_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("events-notfound");
+        var nonExistentClubId = Guid.NewGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{nonExistentClubId}/events");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubEvents_WhenUserIsNotMember_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("events-admin");
+        var strangerToken = await RegisterAndLoginAsync("events-stranger");
+
+        // Admin creates club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Cybersecurity Club" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        // Stranger attempts to view events
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/events");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", strangerToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, getRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubEvents_WithInvalidMonth_Returns400BadRequest()
+    {
+        var token = await RegisterAndLoginAsync("events-badmonth");
+
+        // Create club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "DevOps Society" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/events?year=2026&month=13");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, getRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetClubEvents_WhenUserIsMember_Returns200OK_WithEventsList()
+    {
+        var adminToken = await RegisterAndLoginAsync("events-creator");
+        var memberToken = await RegisterAndLoginAsync("events-viewer");
+
+        // 1. Create club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Gaming Guild" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Member retrieves events
+        using var getReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/events?year=2026&month=11");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var getRes = await _fixture.Client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var events = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Array, events.ValueKind);
+    }
 }
