@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type ClubMemberDto } from '../lib/api'
 
@@ -8,8 +9,11 @@ export interface ClubMembersTableProps {
   errorMessage?: string
   onRetry?: () => void
   isClubAdmin?: boolean
+  currentMemberId?: string
   onPromoteMember?: (memberId: string) => Promise<void> | void
   isPromotingMemberId?: string | null
+  onRemoveMember?: (memberId: string) => Promise<void> | void
+  isRemovingMemberId?: string | null
 }
 
 export default function ClubMembersTable({
@@ -19,10 +23,14 @@ export default function ClubMembersTable({
   errorMessage,
   onRetry,
   isClubAdmin = false,
+  currentMemberId,
   onPromoteMember,
   isPromotingMemberId = null,
+  onRemoveMember,
+  isRemovingMemberId = null,
 }: ClubMembersTableProps) {
   const { t, i18n } = useTranslation()
+  const [memberPendingRemoval, setMemberPendingRemoval] = useState<ClubMemberDto | null>(null)
 
   function formatDate(isoString: string): string {
     if (!isoString) return ''
@@ -152,7 +160,7 @@ export default function ClubMembersTable({
               >
                 {t('members.columns.joined', 'Joined')}
               </th>
-              {isClubAdmin && onPromoteMember && (
+              {isClubAdmin && (onPromoteMember || onRemoveMember) && (
                 <th
                   scope="col"
                   className="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-aurora-text-muted"
@@ -211,37 +219,75 @@ export default function ClubMembersTable({
                       {formatDate(member.joinedAtUtc)}
                     </span>
                   </td>
-                  {isClubAdmin && onPromoteMember && (
+                  {isClubAdmin && (onPromoteMember || onRemoveMember) && (
                     <td className="whitespace-nowrap px-6 py-4 text-right text-xs">
-                      {member.role === 'Club Member' ? (
-                        <button
-                          type="button"
-                          data-testid={`promote-member-${member.memberId}`}
-                          disabled={isPromotingMemberId === member.memberId}
-                          onClick={() => void onPromoteMember(member.memberId)}
-                          className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-primary/10 px-3 py-1.5 font-semibold text-aurora-primary ring-1 ring-aurora-primary/20 hover:bg-aurora-primary/20 disabled:opacity-50 cursor-pointer transition-colors"
-                          aria-label={t('members.actions.promoteAria', { name: displayName })}
-                        >
-                          {isPromotingMemberId === member.memberId ? (
-                            <>
-                              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                              </svg>
-                              <span>{t('members.actions.promoting', 'Promoting…')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                              </svg>
-                              <span>{t('members.actions.promote', 'Make Admin')}</span>
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-aurora-text-muted">—</span>
-                      )}
+                      <div className="flex items-center justify-end space-x-2">
+                        {currentMemberId && member.memberId === currentMemberId ? (
+                          <span
+                            data-testid={`current-user-tag-${member.memberId}`}
+                            className="text-xs text-aurora-text-muted italic"
+                          >
+                            {t('members.actions.you', 'You')}
+                          </span>
+                        ) : (
+                          <>
+                            {onPromoteMember && member.role === 'Club Member' && (
+                              <button
+                                type="button"
+                                data-testid={`promote-member-${member.memberId}`}
+                                disabled={isPromotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
+                                onClick={() => void onPromoteMember(member.memberId)}
+                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-primary/10 px-3 py-1.5 font-semibold text-aurora-primary ring-1 ring-aurora-primary/20 hover:bg-aurora-primary/20 disabled:opacity-50 cursor-pointer transition-colors"
+                                aria-label={t('members.actions.promoteAria', { name: displayName })}
+                              >
+                                {isPromotingMemberId === member.memberId ? (
+                                  <>
+                                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>{t('members.actions.promoting', 'Promoting…')}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                    </svg>
+                                    <span>{t('members.actions.promote', 'Make Admin')}</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            {onRemoveMember && (
+                              <button
+                                type="button"
+                                data-testid={`remove-member-${member.memberId}`}
+                                disabled={isPromotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
+                                onClick={() => setMemberPendingRemoval(member)}
+                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 font-semibold text-red-400 ring-1 ring-red-500/20 hover:bg-red-500/20 disabled:opacity-50 cursor-pointer transition-colors"
+                                aria-label={t('members.actions.removeAria', { name: displayName })}
+                              >
+                                {isRemovingMemberId === member.memberId ? (
+                                  <>
+                                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>{t('members.actions.removing', 'Removing…')}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span>{t('members.actions.remove', 'Remove')}</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -250,6 +296,63 @@ export default function ClubMembersTable({
           </tbody>
         </table>
       </div>
+
+      {memberPendingRemoval && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-modal-title"
+          data-testid="remove-member-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400 ring-1 ring-red-500/20">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 id="remove-modal-title" className="text-lg font-bold text-aurora-text">
+                {t('members.removeModal.title', 'Remove Member')}
+              </h3>
+            </div>
+            <p className="mt-3 text-sm text-aurora-text-secondary leading-relaxed">
+              {t(
+                'members.removeModal.description',
+                'Are you sure you want to remove this member from the club? They will immediately lose access to all club data and dashboards.',
+                {
+                  name: memberPendingRemoval.displayName?.trim() || memberPendingRemoval.email,
+                }
+              )}
+            </p>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                data-testid="cancel-remove-member-btn"
+                onClick={() => setMemberPendingRemoval(null)}
+                className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                data-testid="confirm-remove-member-btn"
+                disabled={isRemovingMemberId === memberPendingRemoval.memberId}
+                onClick={async () => {
+                  const idToRemove = memberPendingRemoval.memberId
+                  setMemberPendingRemoval(null)
+                  if (onRemoveMember) {
+                    await onRemoveMember(idToRemove)
+                  }
+                }}
+                className="btn-tactile rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-600 disabled:opacity-50 cursor-pointer transition-colors"
+              >
+                {t('members.actions.confirmRemove', 'Remove Member')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

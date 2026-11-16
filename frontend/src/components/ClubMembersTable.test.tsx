@@ -6,7 +6,10 @@ import { type ClubMemberDto } from '../lib/api'
 // Mock i18n
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, defaultVal?: string) => defaultVal ?? key,
+    t: (key: string, defaultValOrOptions?: string | Record<string, unknown>) => {
+      if (typeof defaultValOrOptions === 'string') return defaultValOrOptions
+      return key
+    },
     i18n: { language: 'en' },
   }),
 }))
@@ -128,5 +131,91 @@ describe('ClubMembersTable', () => {
     const promoteBobBtn = screen.getByTestId('promote-member-m-2')
     expect(promoteBobBtn).toBeDisabled()
     expect(promoteBobBtn).toHaveTextContent('Promoting…')
+  })
+
+  it('renders Remove button next to members and excludes logged in admin', () => {
+    const handleRemove = vi.fn()
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        currentMemberId="m-1"
+        onRemoveMember={handleRemove}
+      />
+    )
+
+    // Current user has 'You' tag instead of remove button
+    expect(screen.getByTestId('current-user-tag-m-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('remove-member-m-1')).not.toBeInTheDocument()
+
+    // Other member has Remove button
+    expect(screen.getByTestId('remove-member-m-2')).toBeInTheDocument()
+    expect(screen.getByTestId('remove-member-m-2')).toHaveTextContent('Remove')
+  })
+
+  it('opens confirmation modal and executes removal when confirmed', async () => {
+    const handleRemove = vi.fn()
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        currentMemberId="m-1"
+        onRemoveMember={handleRemove}
+      />
+    )
+
+    // Click remove button for Bob
+    const removeBtn = screen.getByTestId('remove-member-m-2')
+    fireEvent.click(removeBtn)
+
+    // Confirmation modal should be open
+    expect(screen.getByTestId('remove-member-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('confirm-remove-member-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('cancel-remove-member-btn')).toBeInTheDocument()
+
+    // Confirm removal
+    fireEvent.click(screen.getByTestId('confirm-remove-member-btn'))
+
+    expect(handleRemove).toHaveBeenCalledWith('m-2')
+    // Modal should close
+    expect(screen.queryByTestId('remove-member-modal')).not.toBeInTheDocument()
+  })
+
+  it('dismisses confirmation modal without calling onRemoveMember when cancelled', () => {
+    const handleRemove = vi.fn()
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        currentMemberId="m-1"
+        onRemoveMember={handleRemove}
+      />
+    )
+
+    // Click remove button for Bob
+    fireEvent.click(screen.getByTestId('remove-member-m-2'))
+    expect(screen.getByTestId('remove-member-modal')).toBeInTheDocument()
+
+    // Click cancel
+    fireEvent.click(screen.getByTestId('cancel-remove-member-btn'))
+
+    expect(handleRemove).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('remove-member-modal')).not.toBeInTheDocument()
+  })
+
+  it('shows removing loading state on remove button when operation is in progress', () => {
+    render(
+      <ClubMembersTable
+        members={sampleMembers}
+        isClubAdmin={true}
+        currentMemberId="m-1"
+        onRemoveMember={vi.fn()}
+        isRemovingMemberId="m-2"
+      />
+    )
+
+    const removeBobBtn = screen.getByTestId('remove-member-m-2')
+    expect(removeBobBtn).toBeDisabled()
+    expect(removeBobBtn).toHaveTextContent('Removing…')
   })
 })
