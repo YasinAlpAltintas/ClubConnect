@@ -9,6 +9,7 @@
   --color-aurora-primary-hover: var(--primary-hover, #7A71F4);
   --color-aurora-secondary: var(--secondary-color, #67C7DF);
   --color-aurora-muted: var(--muted-accent, #A9A4F5);
+  --color-aurora-accent: var(--primary-color, #8B83F6);
   --color-aurora-text: var(--text-primary, #F1F3F9);
   --color-aurora-text-secondary: var(--text-secondary, #A1AABD);
   --color-aurora-text-muted: var(--text-muted, #737F94);
