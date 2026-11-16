@@ -42,6 +42,8 @@ export default function DashboardPage({
   const [promoteNotification, setPromoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   const [removeNotification, setRemoveNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [demotingMemberId, setDemotingMemberId] = useState<string | null>(null)
+  const [demoteNotification, setDemoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     function handleHashChange() {
@@ -202,6 +204,30 @@ export default function DashboardPage({
       setTimeout(() => setRemoveNotification(null), 4000)
     } finally {
       setRemovingMemberId(null)
+    }
+  }
+
+  async function handleDemoteMember(memberId: string) {
+    if (!targetClubId || demotingMemberId) return
+    setDemotingMemberId(memberId)
+    setDemoteNotification(null)
+
+    try {
+      const updated = await updateMemberRole(targetClubId, memberId, 'Club Member', member.token)
+      await refetchMembers()
+      setDemoteNotification({
+        type: 'success',
+        message: t('members.actions.demoteSuccess', { name: updated.displayName || updated.email }),
+      })
+      setTimeout(() => setDemoteNotification(null), 4000)
+    } catch (err) {
+      setDemoteNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : t('members.actions.demoteError', 'Failed to demote member.'),
+      })
+      setTimeout(() => setDemoteNotification(null), 4000)
+    } finally {
+      setDemotingMemberId(null)
     }
   }
 
@@ -465,6 +491,27 @@ export default function DashboardPage({
             </div>
           )}
 
+          {demoteNotification && (
+            <div
+              data-testid={demoteNotification.type === 'success' ? 'demote-success-alert' : 'demote-error-alert'}
+              className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
+                demoteNotification.type === 'success'
+                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
+                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+              }`}
+              role="alert"
+            >
+              <span>{demoteNotification.message}</span>
+              <button
+                type="button"
+                onClick={() => setDemoteNotification(null)}
+                className="ml-3 text-xs opacity-75 hover:opacity-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <ClubMembersTable
             members={clubMembers}
             isLoading={isLoadingMembers}
@@ -477,6 +524,8 @@ export default function DashboardPage({
             isPromotingMemberId={promotingMemberId}
             onRemoveMember={handleRemoveMember}
             isRemovingMemberId={removingMemberId}
+            onDemoteMember={handleDemoteMember}
+            isDemotingMemberId={demotingMemberId}
           />
         </div>
       ) : (

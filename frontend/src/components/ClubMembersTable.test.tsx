@@ -218,4 +218,158 @@ describe('ClubMembersTable', () => {
     expect(removeBobBtn).toBeDisabled()
     expect(removeBobBtn).toHaveTextContent('Removing…')
   })
+
+  it('renders Demote button next to other Club Admin members and excludes logged in admin', () => {
+    const handleDemote = vi.fn()
+    const multiAdminMembers: ClubMemberDto[] = [
+      {
+        memberId: 'admin-1',
+        displayName: 'Alice Admin',
+        email: 'alice@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-01T00:00:00Z',
+      },
+      {
+        memberId: 'admin-2',
+        displayName: 'Dave Admin',
+        email: 'dave@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-02T00:00:00Z',
+      },
+    ]
+
+    render(
+      <ClubMembersTable
+        members={multiAdminMembers}
+        isClubAdmin={true}
+        currentMemberId="admin-1"
+        onDemoteMember={handleDemote}
+      />
+    )
+
+    // Current admin has 'You' tag instead of Demote button
+    expect(screen.getByTestId('current-user-tag-admin-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('demote-member-admin-1')).not.toBeInTheDocument()
+
+    // Other admin has Demote button
+    const demoteDaveBtn = screen.getByTestId('demote-member-admin-2')
+    expect(demoteDaveBtn).toBeInTheDocument()
+    expect(demoteDaveBtn).toHaveTextContent('Demote')
+  })
+
+  it('opens demote confirmation modal and executes demotion when confirmed', async () => {
+    const handleDemote = vi.fn()
+    const multiAdminMembers: ClubMemberDto[] = [
+      {
+        memberId: 'admin-1',
+        displayName: 'Alice Admin',
+        email: 'alice@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-01T00:00:00Z',
+      },
+      {
+        memberId: 'admin-2',
+        displayName: 'Dave Admin',
+        email: 'dave@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-02T00:00:00Z',
+      },
+    ]
+
+    render(
+      <ClubMembersTable
+        members={multiAdminMembers}
+        isClubAdmin={true}
+        currentMemberId="admin-1"
+        onDemoteMember={handleDemote}
+      />
+    )
+
+    // Click demote button
+    const demoteBtn = screen.getByTestId('demote-member-admin-2')
+    fireEvent.click(demoteBtn)
+
+    // Modal appears
+    expect(screen.getByTestId('demote-member-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('confirm-demote-member-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('cancel-demote-member-btn')).toBeInTheDocument()
+
+    // Confirm demotion
+    fireEvent.click(screen.getByTestId('confirm-demote-member-btn'))
+
+    expect(handleDemote).toHaveBeenCalledWith('admin-2')
+    expect(screen.queryByTestId('demote-member-modal')).not.toBeInTheDocument()
+  })
+
+  it('dismisses demote confirmation modal without calling onDemoteMember when cancelled', () => {
+    const handleDemote = vi.fn()
+    const multiAdminMembers: ClubMemberDto[] = [
+      {
+        memberId: 'admin-1',
+        displayName: 'Alice Admin',
+        email: 'alice@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-01T00:00:00Z',
+      },
+      {
+        memberId: 'admin-2',
+        displayName: 'Dave Admin',
+        email: 'dave@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-02T00:00:00Z',
+      },
+    ]
+
+    render(
+      <ClubMembersTable
+        members={multiAdminMembers}
+        isClubAdmin={true}
+        currentMemberId="admin-1"
+        onDemoteMember={handleDemote}
+      />
+    )
+
+    // Click demote button
+    fireEvent.click(screen.getByTestId('demote-member-admin-2'))
+    expect(screen.getByTestId('demote-member-modal')).toBeInTheDocument()
+
+    // Click cancel
+    fireEvent.click(screen.getByTestId('cancel-demote-member-btn'))
+
+    expect(handleDemote).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('demote-member-modal')).not.toBeInTheDocument()
+  })
+
+  it('shows demoting loading state on demote button when demotion is in progress', () => {
+    const multiAdminMembers: ClubMemberDto[] = [
+      {
+        memberId: 'admin-1',
+        displayName: 'Alice Admin',
+        email: 'alice@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-01T00:00:00Z',
+      },
+      {
+        memberId: 'admin-2',
+        displayName: 'Dave Admin',
+        email: 'dave@example.com',
+        role: 'Club Admin',
+        joinedAtUtc: '2026-01-02T00:00:00Z',
+      },
+    ]
+
+    render(
+      <ClubMembersTable
+        members={multiAdminMembers}
+        isClubAdmin={true}
+        currentMemberId="admin-1"
+        onDemoteMember={vi.fn()}
+        isDemotingMemberId="admin-2"
+      />
+    )
+
+    const demoteDaveBtn = screen.getByTestId('demote-member-admin-2')
+    expect(demoteDaveBtn).toBeDisabled()
+    expect(demoteDaveBtn).toHaveTextContent('Demoting…')
+  })
 })
