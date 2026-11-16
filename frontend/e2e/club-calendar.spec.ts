@@ -62,7 +62,7 @@ test.describe('INC-23: View Monthly Calendar Grid', () => {
     expect(strangerGetEventsRes.status()).toBe(403)
 
     // 8. Non-existent club -> 404 Not Found
-    const notFoundRes = await request.get('/api/clubs/00000000-0000-0000-0000-000000000000/events', {
+    const notFoundRes = await request.get('/api/clubs/11111111-1111-1111-1111-111111111111/events', {
       headers: { Authorization: `Bearer ${adminToken}` },
     })
     expect(notFoundRes.status()).toBe(404)
@@ -96,14 +96,14 @@ test.describe('INC-23: View Monthly Calendar Grid', () => {
 
     // 3. Log in through UI
     await page.goto('/')
-    await page.getByTestId('auth-mode-toggle').click()
-    await page.getByTestId('login-email-input').fill(userEmail)
-    await page.getByTestId('login-password-input').fill(password)
-    await page.getByTestId('login-submit-btn').click()
+    await page.getByRole('button', { name: /Log in|Inloggen/ }).click()
+    await page.fill('#email', userEmail)
+    await page.fill('#password', password)
+    await page.click('button[type="submit"]')
 
     // 4. Enter club dashboard from Lobby
-    await expect(page.getByTestId('lobby-heading')).toBeVisible()
-    await page.getByTestId(`club-card-${club.id}`).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Club Lobby/)
+    await page.getByTestId(`enter-dashboard-${club.id}`).click()
 
     // 5. On Overview page, verify Club Header and Calendar module
     await expect(page.getByTestId('dashboard-club-name')).toHaveTextContent('Astronomy & Stargazing')
