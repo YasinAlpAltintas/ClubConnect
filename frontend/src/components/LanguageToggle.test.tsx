@@ -19,7 +19,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('LanguageToggle', () => {
-  it('renders flag and switches language when clicked', async () => {
+  it('renders target language label and switches language when clicked', async () => {
     const user = userEvent.setup()
     currentLanguage = 'nl-BE'
 
@@ -27,7 +27,6 @@ describe('LanguageToggle', () => {
 
     const toggleBtn = screen.getByRole('button', { name: /English/i })
     expect(toggleBtn).toBeInTheDocument()
-    expect(screen.getByText('🇬🇧')).toBeInTheDocument()
 
     await user.click(toggleBtn)
     expect(changeLanguageMock).toHaveBeenCalledWith('en')

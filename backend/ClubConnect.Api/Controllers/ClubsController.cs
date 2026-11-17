@@ -20,7 +20,8 @@ public class ClubsController(
     GetClubMembersUseCase? getClubMembersUseCase = null,
     UpdateMemberRoleUseCase? updateMemberRoleUseCase = null,
     RemoveClubMemberUseCase? removeClubMemberUseCase = null,
-    GetClubEventsUseCase? getClubEventsUseCase = null) : ControllerBase
+    GetClubEventsUseCase? getClubEventsUseCase = null,
+    CreateClubEventUseCase? createClubEventUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -449,6 +450,14 @@ public class ClubsController(
         };
     }
 
+    /// <summary>Request body for <c>POST /api/clubs/{id}/events</c>.</summary>
+    public sealed record CreateClubEventRequest(
+        [property: JsonPropertyName("title")] string? Title,
+        [property: JsonPropertyName("description")] string? Description,
+        [property: JsonPropertyName("location")] string? Location,
+        [property: JsonPropertyName("startTimeUtc")] DateTimeOffset StartTimeUtc,
+        [property: JsonPropertyName("endTimeUtc")] DateTimeOffset EndTimeUtc);
+
     /// <summary>Response item for <c>GET /api/clubs/{id}/events</c>.</summary>
     public sealed record ClubEventResponse(
         Guid Id,
@@ -529,6 +538,86 @@ public class ClubsController(
             GetClubEventsStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             GetClubEventsStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>
+    /// Schedules a new event for the specified club workspace (INC-24).
+    /// Enforces multi-tenant authorization: only authenticated Club Admins of the club can schedule events.
+    /// 201 → created event · 400 → invalid title / time bounds · 401 → unauthenticated · 403 → forbidden · 404 → club not found.
+    /// </summary>
+    [HttpPost("{id:guid}/events")]
+    [ProducesResponseType(typeof(ClubEventResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateClubEvent(
+        [FromRoute] Guid id,
+        [FromBody] CreateClubEventRequest request,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (createClubEventUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Event creation service is unavailable." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { error = "invalid_input", detail = "Request body is required." });
+        }
+
+        var command = new CreateClubEventCommand
+        {
+            ClubId = id,
+            AdminMemberId = validation.MemberId.Value,
+            Title = request.Title ?? string.Empty,
+            Description = request.Description,
+            Location = request.Location,
+            StartTimeUtc = request.StartTimeUtc,
+            EndTimeUtc = request.EndTimeUtc
+        };
+
+        var outcome = await createClubEventUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            CreateClubEventStatus.Success => CreatedAtAction(
+                nameof(GetClubEvents),
+                new { id = outcome.Event!.ClubId },
+                new ClubEventResponse(
+                    outcome.Event.Id,
+                    outcome.Event.ClubId,
+                    outcome.Event.Title,
+                    outcome.Event.Description,
+                    outcome.Event.Location,
+                    outcome.Event.StartTimeUtc,
+                    outcome.Event.EndTimeUtc,
+                    outcome.Event.CreatedByMemberId,
+                    outcome.Event.CreatedAtUtc)),
+            CreateClubEventStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            CreateClubEventStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            CreateClubEventStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "creation_failed", detail = outcome.Violation })
         };
     }
 }

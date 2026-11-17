@@ -346,9 +346,12 @@ export default function DashboardPage({
               type="button"
               data-testid="access-denied-back-btn"
               onClick={onNavigateToLobby}
-              className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-surface px-4 py-2.5 text-sm font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-elevated cursor-pointer"
+              className="btn-tactile inline-flex items-center justify-center gap-1.5 rounded-xl bg-aurora-surface px-4 py-2.5 text-sm font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-elevated cursor-pointer"
             >
-              {t('dashboard.backToLobby')}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>{t('dashboard.backToLobby')}</span>
             </button>
           </div>
         </div>
@@ -412,14 +415,6 @@ export default function DashboardPage({
             </button>
           ) : (
             <>
-              <button
-                type="button"
-                data-testid="dashboard-calendar-nav-btn"
-                onClick={() => navigateToSubView('calendar')}
-                className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors"
-              >
-                {t('calendar.navButton')}
-              </button>
               {isClubAdmin && (
                 <button
                   type="button"
@@ -616,6 +611,10 @@ export default function DashboardPage({
             errorMessage={eventsError instanceof Error ? eventsError.message : undefined}
             onRetry={() => void refetchEvents()}
             clubName={currentClub?.name ?? ''}
+            clubId={currentClub?.id}
+            token={member.token}
+            isAdmin={currentClub?.role === 'Club Admin'}
+            onEventCreated={() => void refetchEvents()}
           />
         </div>
       ) : (
@@ -659,19 +658,8 @@ export default function DashboardPage({
                   )}
                 </div>
 
-                <div className="flex items-center space-x-3 sm:self-start">
-                  <button
-                    type="button"
-                    data-testid="dashboard-calendar-header-btn"
-                    onClick={() => navigateToSubView('calendar')}
-                    className="btn-tactile inline-flex items-center space-x-2 rounded-xl bg-aurora-primary/10 px-3.5 py-2 text-xs font-semibold text-aurora-primary ring-1 ring-aurora-primary/25 hover:bg-aurora-primary/20 transition-colors cursor-pointer"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>{t('calendar.navButton')}</span>
-                  </button>
-                  {isClubAdmin && (
+                {isClubAdmin && (
+                  <div className="flex items-center space-x-3 sm:self-start">
                     <button
                       type="button"
                       data-testid="dashboard-members-btn"
@@ -683,8 +671,8 @@ export default function DashboardPage({
                       </svg>
                       <span>{t('members.title')}</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {currentClub.role === 'Club Admin' && currentClub.inviteCode && (
@@ -719,19 +707,9 @@ export default function DashboardPage({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-text-muted ring-1 ring-aurora-border">
-                        {t('dashboard.modules.comingSoon')}
-                      </span>
-                      <button
-                        type="button"
-                        data-testid="dashboard-calendar-btn"
-                        onClick={() => navigateToSubView('calendar')}
-                        className="btn-tactile rounded-full bg-aurora-primary/10 px-2.5 py-1 text-[11px] font-semibold text-aurora-primary ring-1 ring-aurora-primary/25 hover:bg-aurora-primary/20 cursor-pointer transition-colors"
-                      >
-                        {t('calendar.openCalendar')} →
-                      </button>
-                    </div>
+                    <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-text-muted ring-1 ring-aurora-border">
+                      {t('dashboard.modules.comingSoon')}
+                    </span>
                   </div>
                   <h3 className="mt-4 font-semibold text-aurora-text">
                     {t('dashboard.modules.calendarTitle')}
@@ -743,11 +721,12 @@ export default function DashboardPage({
                 <div className="mt-4 pt-3 border-t border-aurora-border/60">
                   <button
                     type="button"
-                    data-testid="dashboard-open-calendar-action"
+                    data-testid="dashboard-calendar-btn"
                     onClick={() => navigateToSubView('calendar')}
-                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-primary hover:text-white cursor-pointer transition-all"
+                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-primary hover:text-white cursor-pointer transition-all flex items-center justify-center gap-1.5"
                   >
-                    {t('calendar.openCalendar')}
+                    <span>{t('calendar.openCalendar')}</span>
+                    <span aria-hidden="true">→</span>
                   </button>
                 </div>
               </article>
