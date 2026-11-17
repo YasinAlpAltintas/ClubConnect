@@ -351,4 +351,72 @@ public class ClubRepositoryTests : IDisposable
         Assert.False(await repository.IsClubAdminAsync(club.Id, outsider.Id, CancellationToken.None));
         Assert.False(await repository.IsClubAdminAsync(Guid.NewGuid(), admin.Id, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task SetEventRsvpAsync_WhenEventNotFound_ReturnsNull()
+    {
+        var admin = await SeedMemberAsync("rsvp-admin@example.com");
+        var repository = NewRepository();
+
+        var result = await repository.SetEventRsvpAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            admin.Id,
+            true,
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task SetEventRsvpAsync_RegistersAndCancelsAttendance()
+    {
+        var admin = await SeedMemberAsync("rsvp-test-admin@example.com");
+        var member = await SeedMemberAsync("rsvp-test-member@example.com");
+        var repository = NewRepository();
+
+        var club = await repository.CreateClubWithAdminAsync("RSVP Club", "Desc", admin.Id, CancellationToken.None);
+        var createdEvent = await repository.CreateEventAsync(new Domain.Entities.ClubEvent
+        {
+            ClubId = club.Id,
+            Title = "Hackathon",
+            StartTimeUtc = DateTimeOffset.UtcNow.AddDays(1),
+            EndTimeUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(3),
+            CreatedByMemberId = admin.Id
+        }, CancellationToken.None);
+
+        // 1. Member RSVPs -> Attending
+        var attendingResult = await repository.SetEventRsvpAsync(
+            club.Id,
+            createdEvent.Id,
+            member.Id,
+            true,
+            CancellationToken.None);
+
+        Assert.NotNull(attendingResult);
+        Assert.Single(attendingResult.Attendees);
+        Assert.Equal(member.Id, attendingResult.Attendees.First().MemberId);
+
+        // Idempotent: RSVPing again does not duplicate
+        var duplicateRsvpResult = await repository.SetEventRsvpAsync(
+            club.Id,
+            createdEvent.Id,
+            member.Id,
+            true,
+            CancellationToken.None);
+
+        Assert.NotNull(duplicateRsvpResult);
+        Assert.Single(duplicateRsvpResult.Attendees);
+
+        // 2. Member cancels RSVP -> Not Attending
+        var cancelResult = await repository.SetEventRsvpAsync(
+            club.Id,
+            createdEvent.Id,
+            member.Id,
+            false,
+            CancellationToken.None);
+
+        Assert.NotNull(cancelResult);
+        Assert.Empty(cancelResult.Attendees);
+    }
 }
