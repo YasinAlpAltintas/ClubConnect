@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using ClubConnect.Application.Abstractions;
 using ClubConnect.Application.Clubs;
 using ClubConnect.Domain.Abstractions;
+using ClubConnect.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -459,6 +460,13 @@ public class ClubsController(
         [property: JsonPropertyName("startTimeUtc")] DateTimeOffset StartTimeUtc,
         [property: JsonPropertyName("endTimeUtc")] DateTimeOffset EndTimeUtc);
 
+    /// <summary>Attendee item representation for event RSVP (INC-26).</summary>
+    public sealed record ClubEventAttendeeResponse(
+        Guid MemberId,
+        string DisplayName,
+        string Email,
+        DateTimeOffset RsvpAtUtc);
+
     /// <summary>Response item for <c>GET /api/clubs/{id}/events</c>.</summary>
     public sealed record ClubEventResponse(
         Guid Id,
@@ -469,7 +477,38 @@ public class ClubsController(
         DateTimeOffset StartTimeUtc,
         DateTimeOffset EndTimeUtc,
         Guid CreatedByMemberId,
-        DateTimeOffset CreatedAtUtc);
+        DateTimeOffset CreatedAtUtc,
+        int AttendeeCount = 0,
+        bool IsAttending = false,
+        IReadOnlyList<ClubEventAttendeeResponse>? Attendees = null);
+
+    private static ClubEventResponse MapToEventResponse(ClubEvent e, Guid requestingMemberId)
+    {
+        var attendeeList = (e.Attendees ?? Array.Empty<ClubEventAttendee>())
+            .Select(a => new ClubEventAttendeeResponse(
+                a.MemberId,
+                string.IsNullOrWhiteSpace(a.Member?.DisplayName) ? "Club Member" : a.Member.DisplayName,
+                a.Member?.Email ?? string.Empty,
+                a.RsvpAtUtc))
+            .ToList();
+
+        var isAttending = (e.Attendees ?? Array.Empty<ClubEventAttendee>())
+            .Any(a => a.MemberId == requestingMemberId);
+
+        return new ClubEventResponse(
+            e.Id,
+            e.ClubId,
+            e.Title,
+            e.Description,
+            e.Location,
+            e.StartTimeUtc,
+            e.EndTimeUtc,
+            e.CreatedByMemberId,
+            e.CreatedAtUtc,
+            attendeeList.Count,
+            isAttending,
+            attendeeList);
+    }
 
     /// <summary>
     /// Retrieves scheduled events for the specified club workspace (INC-23).
@@ -525,16 +564,7 @@ public class ClubsController(
 
         return outcome.Status switch
         {
-            GetClubEventsStatus.Success => Ok(outcome.Events.Select(e => new ClubEventResponse(
-                e.Id,
-                e.ClubId,
-                e.Title,
-                e.Description,
-                e.Location,
-                e.StartTimeUtc,
-                e.EndTimeUtc,
-                e.CreatedByMemberId,
-                e.CreatedAtUtc))),
+            GetClubEventsStatus.Success => Ok(outcome.Events.Select(e => MapToEventResponse(e, validation.MemberId.Value))),
             GetClubEventsStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
             GetClubEventsStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             GetClubEventsStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
@@ -605,16 +635,7 @@ public class ClubsController(
             CreateClubEventStatus.Success => CreatedAtAction(
                 nameof(GetClubEvents),
                 new { id = outcome.Event!.ClubId },
-                new ClubEventResponse(
-                    outcome.Event.Id,
-                    outcome.Event.ClubId,
-                    outcome.Event.Title,
-                    outcome.Event.Description,
-                    outcome.Event.Location,
-                    outcome.Event.StartTimeUtc,
-                    outcome.Event.EndTimeUtc,
-                    outcome.Event.CreatedByMemberId,
-                    outcome.Event.CreatedAtUtc)),
+                MapToEventResponse(outcome.Event, validation.MemberId.Value)),
             CreateClubEventStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
             CreateClubEventStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             CreateClubEventStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
@@ -690,20 +711,80 @@ public class ClubsController(
 
         return outcome.Status switch
         {
-            UpdateClubEventStatus.Success => Ok(new ClubEventResponse(
-                outcome.Event!.Id,
-                outcome.Event.ClubId,
-                outcome.Event.Title,
-                outcome.Event.Description,
-                outcome.Event.Location,
-                outcome.Event.StartTimeUtc,
-                outcome.Event.EndTimeUtc,
-                outcome.Event.CreatedByMemberId,
-                outcome.Event.CreatedAtUtc)),
+            UpdateClubEventStatus.Success => Ok(MapToEventResponse(outcome.Event!, validation.MemberId.Value)),
             UpdateClubEventStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.ErrorMessage }),
             UpdateClubEventStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.ErrorMessage }),
             UpdateClubEventStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.ErrorMessage }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "update_failed", detail = outcome.ErrorMessage })
+        };
+    }
+
+    /// <summary>Request body for <c>POST /api/clubs/{id}/events/{eventId}/rsvp</c> (INC-26).</summary>
+    public sealed record EventRsvpRequest(
+        [property: JsonPropertyName("isAttending")] bool IsAttending);
+
+    /// <summary>
+    /// Records or cancels an RSVP attendance for a scheduled event (INC-26).
+    /// Enforces multi-tenant isolation: only active members of the requested club can RSVP.
+    /// 200 → updated event response · 400 → invalid input · 401 → unauthenticated · 403 → forbidden · 404 → not found.
+    /// </summary>
+    [HttpPost("{id:guid}/events/{eventId:guid}/rsvp")]
+    [ProducesResponseType(typeof(ClubEventResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetEventRsvp(
+        [FromRoute] Guid id,
+        [FromRoute] Guid eventId,
+        [FromBody] EventRsvpRequest request,
+        [FromServices] SetEventRsvpUseCase setEventRsvpUseCase,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (setEventRsvpUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "RSVP service is unavailable." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { error = "invalid_input", detail = "Request body is required." });
+        }
+
+        var command = new SetEventRsvpCommand(
+            ClubId: id,
+            EventId: eventId,
+            MemberId: validation.MemberId.Value,
+            IsAttending: request.IsAttending);
+
+        var outcome = await setEventRsvpUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            SetEventRsvpStatus.Success => Ok(MapToEventResponse(outcome.Event!, validation.MemberId.Value)),
+            SetEventRsvpStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.ErrorMessage }),
+            SetEventRsvpStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.ErrorMessage }),
+            SetEventRsvpStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.ErrorMessage }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "rsvp_failed", detail = outcome.ErrorMessage })
         };
     }
 }
