@@ -1211,4 +1211,166 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
         Assert.Equal(updatedStart, updatedEvt.GetProperty("startTimeUtc").GetDateTimeOffset());
         Assert.Equal(updatedEnd, updatedEvt.GetProperty("endTimeUtc").GetDateTimeOffset());
     }
+
+    [Fact]
+    public async Task SetEventRsvp_WithoutToken_Returns401Unauthorized()
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{Guid.NewGuid()}/events/{Guid.NewGuid()}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = true })
+        };
+        using var res = await _fixture.Client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetEventRsvp_WithNonExistentClub_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("rsvp-nonexistent-club");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{Guid.NewGuid()}/events/{Guid.NewGuid()}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = true })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _fixture.Client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetEventRsvp_WhenCallerNotMember_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("rsvp-admin-member");
+        var strangerToken = await RegisterAndLoginAsync("rsvp-stranger");
+
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Astronomy Society" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        using var createEvtReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Stargazing Night",
+                startTimeUtc = DateTimeOffset.UtcNow.AddDays(1),
+                endTimeUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(2)
+            })
+        };
+        createEvtReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createEvtRes = await _fixture.Client.SendAsync(createEvtReq);
+        var createdEvt = await createEvtRes.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = createdEvt.GetProperty("id").GetString();
+
+        // Stranger attempts to RSVP
+        using var rsvpReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events/{eventId}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = true })
+        };
+        rsvpReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", strangerToken);
+        using var rsvpRes = await _fixture.Client.SendAsync(rsvpReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, rsvpRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetEventRsvp_WithNonExistentEvent_Returns404NotFound()
+    {
+        var adminToken = await RegisterAndLoginAsync("rsvp-nonexistent-event");
+
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Math Club" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        using var rsvpReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events/{Guid.NewGuid()}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = true })
+        };
+        rsvpReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var rsvpRes = await _fixture.Client.SendAsync(rsvpReq);
+
+        Assert.Equal(HttpStatusCode.NotFound, rsvpRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetEventRsvp_WhenCallerIsMember_Returns200OK_WithUpdatedAttendanceAndCount()
+    {
+        var adminToken = await RegisterAndLoginAsync("rsvp-flow-admin");
+        var memberToken = await RegisterAndLoginAsync("rsvp-flow-member");
+
+        // 1. Admin creates club
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Robotics & AI Guild" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/join")
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Admin creates event
+        using var createEvtReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Robot Maze Competition",
+                location = "Lab 101",
+                startTimeUtc = DateTimeOffset.UtcNow.AddDays(3),
+                endTimeUtc = DateTimeOffset.UtcNow.AddDays(3).AddHours(4)
+            })
+        };
+        createEvtReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createEvtRes = await _fixture.Client.SendAsync(createEvtReq);
+        var createdEvt = await createEvtRes.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = createdEvt.GetProperty("id").GetString();
+
+        // 4. Member RSVPs -> Attending
+        using var attendReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events/{eventId}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = true })
+        };
+        attendReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var attendRes = await _fixture.Client.SendAsync(attendReq);
+
+        Assert.Equal(HttpStatusCode.OK, attendRes.StatusCode);
+        var attendBody = await attendRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(attendBody.GetProperty("isAttending").GetBoolean());
+        Assert.Equal(1, attendBody.GetProperty("attendeeCount").GetInt32());
+        var attendees = attendBody.GetProperty("attendees");
+        Assert.Equal(1, attendees.GetArrayLength());
+
+        // 5. Member cancels RSVP -> Not Attending
+        using var cancelReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events/{eventId}/rsvp")
+        {
+            Content = JsonContent.Create(new { isAttending = false })
+        };
+        cancelReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var cancelRes = await _fixture.Client.SendAsync(cancelReq);
+
+        Assert.Equal(HttpStatusCode.OK, cancelRes.StatusCode);
+        var cancelBody = await cancelRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(cancelBody.GetProperty("isAttending").GetBoolean());
+        Assert.Equal(0, cancelBody.GetProperty("attendeeCount").GetInt32());
+        Assert.Equal(0, cancelBody.GetProperty("attendees").GetArrayLength());
+    }
 }

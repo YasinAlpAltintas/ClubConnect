@@ -193,4 +193,17 @@ public interface IClubRepository
     Task<ClubEvent?> UpdateEventAsync(
         ClubEvent clubEvent,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates or toggles a member's RSVP status for a club event (INC-26).
+    /// If <paramref name="isAttending"/> is true, registers the member as attending.
+    /// If false, cancels their attendance.
+    /// Returns the updated event with attendees, or null if the event/club was not found.
+    /// </summary>
+    Task<ClubEvent?> SetEventRsvpAsync(
+        Guid clubId,
+        Guid eventId,
+        Guid memberId,
+        bool isAttending,
+        CancellationToken cancellationToken);
 }

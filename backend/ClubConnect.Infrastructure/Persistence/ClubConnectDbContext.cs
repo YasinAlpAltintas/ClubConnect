@@ -24,6 +24,8 @@ public class ClubConnectDbContext : DbContext
 
     public DbSet<ClubEvent> Events => Set<ClubEvent>();
 
+    public DbSet<ClubEventAttendee> EventAttendees => Set<ClubEventAttendee>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // The Application layer canonicalizes e-mail (lower-cased, trimmed)
@@ -166,6 +168,30 @@ public class ClubConnectDbContext : DbContext
 
             entity.HasIndex(e => new { e.ClubId, e.StartTimeUtc })
                 .HasDatabaseName("IX_ClubEvents_ClubId_StartTimeUtc");
+        });
+
+        modelBuilder.Entity<ClubEventAttendee>(entity =>
+        {
+            entity.ToTable("ClubEventAttendees");
+
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.RsvpAtUtc)
+                .IsRequired();
+
+            entity.HasOne(a => a.Event)
+                .WithMany(e => e.Attendees)
+                .HasForeignKey(a => a.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(a => a.Member)
+                .WithMany()
+                .HasForeignKey(a => a.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(a => new { a.EventId, a.MemberId })
+                .IsUnique()
+                .HasDatabaseName("IX_ClubEventAttendees_EventId_MemberId");
         });
     }
 }

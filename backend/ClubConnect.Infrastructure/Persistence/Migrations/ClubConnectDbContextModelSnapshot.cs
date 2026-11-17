@@ -83,9 +83,36 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedByMemberId");
 
-                    b.HasIndex("ClubId", "StartTimeUtc");
+                    b.HasIndex("ClubId", "StartTimeUtc")
+                        .HasDatabaseName("IX_ClubEvents_ClubId_StartTimeUtc");
 
                     b.ToTable("ClubEvents", (string)null);
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubEventAttendee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RsvpAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.HasIndex("EventId", "MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ClubEventAttendees_EventId_MemberId");
+
+                    b.ToTable("ClubEventAttendees", (string)null);
                 });
 
             modelBuilder.Entity("ClubConnect.Domain.Entities.ClubInvite", b =>
@@ -113,10 +140,12 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClubId");
+                    b.HasIndex("ClubId")
+                        .HasDatabaseName("IX_ClubInvites_ClubId");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_ClubInvites_Code");
 
                     b.ToTable("ClubInvites", (string)null);
                 });
@@ -148,7 +177,8 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Members_Email");
 
                     b.ToTable("Members", (string)null);
                 });
@@ -178,7 +208,8 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.HasIndex("MemberId");
 
                     b.HasIndex("ClubId", "MemberId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Memberships_ClubId_MemberId");
 
                     b.ToTable("Memberships", (string)null);
                 });
@@ -200,6 +231,25 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.Navigation("Club");
 
                     b.Navigation("CreatedByMember");
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubEventAttendee", b =>
+                {
+                    b.HasOne("ClubConnect.Domain.Entities.ClubEvent", "Event")
+                        .WithMany("Attendees")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClubConnect.Domain.Entities.Member", "Member")
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("ClubConnect.Domain.Entities.ClubInvite", b =>
@@ -239,6 +289,11 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.Navigation("Invites");
 
                     b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubEvent", b =>
+                {
+                    b.Navigation("Attendees");
                 });
 
             modelBuilder.Entity("ClubConnect.Domain.Entities.Member", b =>

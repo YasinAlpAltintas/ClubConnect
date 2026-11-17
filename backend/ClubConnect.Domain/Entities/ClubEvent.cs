@@ -36,4 +36,7 @@ public class ClubEvent
 
     /// <summary>Creation timestamp in UTC.</summary>
     public DateTimeOffset CreatedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Collection of attendees who have RSVP'd to this event (INC-26).</summary>
+    public ICollection<ClubEventAttendee> Attendees { get; set; } = new List<ClubEventAttendee>();
 }

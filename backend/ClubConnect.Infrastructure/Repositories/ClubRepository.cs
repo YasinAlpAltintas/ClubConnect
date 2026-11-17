@@ -432,6 +432,8 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
     {
         var query = context.Events
             .AsNoTracking()
+            .Include(e => e.Attendees)
+                .ThenInclude(a => a.Member)
             .Where(e => e.ClubId == clubId);
 
         if (fromUtc.HasValue)
@@ -465,6 +467,8 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
         CancellationToken cancellationToken)
     {
         return await context.Events
+            .Include(e => e.Attendees)
+                .ThenInclude(a => a.Member)
             .FirstOrDefaultAsync(e => e.ClubId == clubId && e.Id == eventId, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -490,5 +494,56 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
 
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return existing;
+    }
+
+    public async Task<ClubEvent?> SetEventRsvpAsync(
+        Guid clubId,
+        Guid eventId,
+        Guid memberId,
+        bool isAttending,
+        CancellationToken cancellationToken)
+    {
+        var existingEvent = await context.Events
+            .Include(e => e.Attendees)
+                .ThenInclude(a => a.Member)
+            .FirstOrDefaultAsync(e => e.ClubId == clubId && e.Id == eventId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existingEvent is null)
+        {
+            return null;
+        }
+
+        var existingAttendee = existingEvent.Attendees.FirstOrDefault(a => a.MemberId == memberId);
+
+        if (isAttending && existingAttendee is null)
+        {
+            var member = await context.Members
+                .FirstOrDefaultAsync(m => m.Id == memberId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var newAttendee = new ClubEventAttendee
+            {
+                EventId = eventId,
+                MemberId = memberId,
+                Member = member,
+                RsvpAtUtc = DateTimeOffset.UtcNow
+            };
+            await context.EventAttendees.AddAsync(newAttendee, cancellationToken).ConfigureAwait(false);
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!existingEvent.Attendees.Any(a => a.MemberId == memberId))
+            {
+                existingEvent.Attendees.Add(newAttendee);
+            }
+        }
+        else if (!isAttending && existingAttendee is not null)
+        {
+            context.EventAttendees.Remove(existingAttendee);
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            existingEvent.Attendees.Remove(existingAttendee);
+        }
+
+        return existingEvent;
     }
 }

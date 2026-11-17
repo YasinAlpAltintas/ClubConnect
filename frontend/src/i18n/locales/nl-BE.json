@@ -304,6 +304,19 @@
         "datesInvalid": "Eindtijd moet na de starttijd liggen.",
         "generic": "Kon evenement niet inplannen. Probeer het opnieuw."
       }
+    },
+    "rsvp": {
+      "attending": "Ik ben aanwezig",
+      "cancel": "Afmelden",
+      "youAreAttending": "Je bent aanwezig",
+      "attendeesTitle": "Aanwezigen",
+      "attendeeCount": "{{count}} aanwezig",
+      "attendeeCount_one": "1 aanwezig",
+      "attendeeCount_other": "{{count}} aanwezig",
+      "noAttendees": "Nog geen aanwezigen. Wees de eerste!",
+      "successAttending": "Je bent nu aangemeld voor dit evenement!",
+      "successCancelled": "Je hebt je afgemeld voor dit evenement.",
+      "error": "Kon aanmelding niet bijwerken. Probeer het opnieuw."
     }
   },
   "onboarding": {

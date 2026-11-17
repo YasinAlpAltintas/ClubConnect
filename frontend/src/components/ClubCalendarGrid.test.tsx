@@ -510,4 +510,175 @@ describe('ClubCalendarGrid', () => {
     expect(screen.getByTestId('calendar-success-banner')).toHaveTextContent(/Advanced Robotics Workshop & AI Lab/i)
     expect(onEventUpdated).toHaveBeenCalledWith(updatedMockEvent)
   })
+
+  // ========================================================
+  // INC-26: Event RSVP ("I'm Attending")
+  // ========================================================
+
+  it('displays RSVP button, attendee count, and empty state when no attendees', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+        clubId="club-123"
+        token="mem-token"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    expect(screen.getByTestId('calendar-event-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('event-attendee-count-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('event-rsvp-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('event-rsvp-btn')).toHaveTextContent(/I'm Attending|Ik ben aanwezig/i)
+    expect(screen.queryByTestId('event-user-attending-badge')).not.toBeInTheDocument()
+    expect(screen.getByTestId('event-attendees-section')).toHaveTextContent(/No attendees yet|Nog geen aanwezigen/i)
+  })
+
+  it('displays attending badge, attendee names in list, and Cancel RSVP button when attending', async () => {
+    const user = userEvent.setup()
+
+    const eventWithAttendees: ClubEventDto = {
+      ...sampleEvents[0],
+      isAttending: true,
+      attendeeCount: 1,
+      attendees: [
+        {
+          memberId: 'mem-99',
+          displayName: 'Elena Rostova',
+          email: 'elena@example.com',
+          rsvpAtUtc: '2026-11-15T12:00:00Z',
+        },
+      ],
+    }
+
+    render(
+      <ClubCalendarGrid
+        events={[eventWithAttendees]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+        clubId="club-123"
+        token="mem-token"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    expect(screen.getByTestId('event-user-attending-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('event-user-attending-badge')).toHaveTextContent(/You're attending|Je bent aanwezig/i)
+    expect(screen.getByTestId('event-rsvp-btn')).toHaveTextContent(/Cancel RSVP|Afmelden/i)
+    expect(screen.getByTestId('event-attendee-mem-99')).toBeInTheDocument()
+    expect(screen.getByTestId('event-attendee-mem-99')).toHaveTextContent(/Elena Rostova/i)
+  })
+
+  it('toggles RSVP to attending on click and calls rsvpEventFn with true', async () => {
+    const user = userEvent.setup()
+    const onEventRsvp = vi.fn()
+
+    const updatedAfterRsvp: ClubEventDto = {
+      ...sampleEvents[0],
+      isAttending: true,
+      attendeeCount: 1,
+      attendees: [
+        {
+          memberId: 'mem-me',
+          displayName: 'Current Member',
+          email: 'me@example.com',
+          rsvpAtUtc: new Date().toISOString(),
+        },
+      ],
+    }
+
+    const rsvpEventFn = vi.fn().mockResolvedValue(updatedAfterRsvp)
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+        clubId="club-123"
+        token="mem-token"
+        onEventRsvp={onEventRsvp}
+        rsvpEventFn={rsvpEventFn}
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    const rsvpBtn = screen.getByTestId('event-rsvp-btn')
+    expect(rsvpBtn).toHaveTextContent(/I'm Attending|Ik ben aanwezig/i)
+
+    await user.click(rsvpBtn)
+
+    expect(rsvpEventFn).toHaveBeenCalledTimes(1)
+    expect(rsvpEventFn).toHaveBeenCalledWith('club-123', 'evt-1', true, 'mem-token')
+    expect(onEventRsvp).toHaveBeenCalledWith(updatedAfterRsvp)
+
+    // Modal state updates
+    expect(screen.getByTestId('event-user-attending-badge')).toBeInTheDocument()
+    expect(screen.getByTestId('event-rsvp-btn')).toHaveTextContent(/Cancel RSVP|Afmelden/i)
+    expect(screen.getByTestId('event-attendee-mem-me')).toBeInTheDocument()
+  })
+
+  it('cancels RSVP when already attending and calls rsvpEventFn with false', async () => {
+    const user = userEvent.setup()
+    const onEventRsvp = vi.fn()
+
+    const initialEvent: ClubEventDto = {
+      ...sampleEvents[0],
+      isAttending: true,
+      attendeeCount: 1,
+      attendees: [
+        {
+          memberId: 'mem-me',
+          displayName: 'Current Member',
+          email: 'me@example.com',
+          rsvpAtUtc: new Date().toISOString(),
+        },
+      ],
+    }
+
+    const updatedAfterCancel: ClubEventDto = {
+      ...sampleEvents[0],
+      isAttending: false,
+      attendeeCount: 0,
+      attendees: [],
+    }
+
+    const rsvpEventFn = vi.fn().mockResolvedValue(updatedAfterCancel)
+
+    render(
+      <ClubCalendarGrid
+        events={[initialEvent]}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+        clubId="club-123"
+        token="mem-token"
+        onEventRsvp={onEventRsvp}
+        rsvpEventFn={rsvpEventFn}
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    const rsvpBtn = screen.getByTestId('event-rsvp-btn')
+    expect(rsvpBtn).toHaveTextContent(/Cancel RSVP|Afmelden/i)
+
+    await user.click(rsvpBtn)
+
+    expect(rsvpEventFn).toHaveBeenCalledTimes(1)
+    expect(rsvpEventFn).toHaveBeenCalledWith('club-123', 'evt-1', false, 'mem-token')
+    expect(onEventRsvp).toHaveBeenCalledWith(updatedAfterCancel)
+
+    // Modal state updates
+    expect(screen.queryByTestId('event-user-attending-badge')).not.toBeInTheDocument()
+    expect(screen.getByTestId('event-rsvp-btn')).toHaveTextContent(/I'm Attending|Ik ben aanwezig/i)
+  })
 })
