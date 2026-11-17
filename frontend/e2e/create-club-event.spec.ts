@@ -203,7 +203,7 @@ test.describe('INC-24: Schedule Club Activities ("New Event" Form for Club Admin
     await expect(page.getByTestId('calendar-event-modal')).not.toBeVisible()
 
     // 13. Log out Admin
-    await page.getByTestId('header-logout-btn').click()
+    await page.getByTestId('dashboard-logout-btn').click()
     await expect(page.getByRole('button', { name: /Log in|Inloggen/ })).toBeVisible()
 
     // 14. Log in as Ordinary Member
