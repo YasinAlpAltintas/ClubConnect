@@ -981,4 +981,234 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
         Assert.Equal(JsonValueKind.Array, eventsList.ValueKind);
         Assert.True(eventsList.GetArrayLength() >= 1);
     }
+
+    [Fact]
+    public async Task UpdateClubEvent_WithoutToken_Returns401Unauthorized()
+    {
+        var randomClubId = Guid.NewGuid();
+        var randomEventId = Guid.NewGuid();
+        using var response = await _fixture.Client.PutAsJsonAsync(
+            $"{ClubsUrl}/{randomClubId}/events/{randomEventId}",
+            new { title = "New Title", startTimeUtc = DateTimeOffset.UtcNow, endTimeUtc = DateTimeOffset.UtcNow.AddHours(2) });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateClubEvent_WithNonExistentClub_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("update-evt-notfound-club");
+        var nonExistentClubId = Guid.NewGuid();
+        var randomEventId = Guid.NewGuid();
+
+        using var req = new HttpRequestMessage(HttpMethod.Put, $"{ClubsUrl}/{nonExistentClubId}/events/{randomEventId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Valid Title",
+                startTimeUtc = DateTimeOffset.UtcNow,
+                endTimeUtc = DateTimeOffset.UtcNow.AddHours(2)
+            })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var res = await _fixture.Client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateClubEvent_WhenCallerNotAdmin_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("update-evt-admin");
+        var memberToken = await RegisterAndLoginAsync("update-evt-member");
+
+        // 1. Admin creates club
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Biology Society" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Admin creates event
+        var start = DateTimeOffset.UtcNow.AddDays(2);
+        using var createEvtReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Cell Biology Lab",
+                startTimeUtc = start,
+                endTimeUtc = start.AddHours(2)
+            })
+        };
+        createEvtReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createEvtRes = await _fixture.Client.SendAsync(createEvtReq);
+        Assert.Equal(HttpStatusCode.Created, createEvtRes.StatusCode);
+        var evt = await createEvtRes.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = evt.GetProperty("id").GetString();
+
+        // 4. Member attempts to update event -> 403 Forbidden
+        using var updateReq = new HttpRequestMessage(HttpMethod.Put, $"{ClubsUrl}/{clubId}/events/{eventId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Hacked Lab",
+                startTimeUtc = start,
+                endTimeUtc = start.AddHours(2)
+            })
+        };
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var updateRes = await _fixture.Client.SendAsync(updateReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, updateRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateClubEvent_WithNonExistentEvent_Returns404NotFound()
+    {
+        var adminToken = await RegisterAndLoginAsync("update-evt-nonexistent-evt");
+
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Chemistry Club" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        var randomEventId = Guid.NewGuid();
+        using var updateReq = new HttpRequestMessage(HttpMethod.Put, $"{ClubsUrl}/{clubId}/events/{randomEventId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Valid Title",
+                startTimeUtc = DateTimeOffset.UtcNow,
+                endTimeUtc = DateTimeOffset.UtcNow.AddHours(2)
+            })
+        };
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var updateRes = await _fixture.Client.SendAsync(updateReq);
+
+        Assert.Equal(HttpStatusCode.NotFound, updateRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateClubEvent_WithInvalidDates_Returns400BadRequest()
+    {
+        var adminToken = await RegisterAndLoginAsync("update-evt-invalid-dates");
+
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Physics Society" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        var start = DateTimeOffset.UtcNow.AddDays(3);
+        using var createEvtReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Quantum Mechanics",
+                startTimeUtc = start,
+                endTimeUtc = start.AddHours(2)
+            })
+        };
+        createEvtReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createEvtRes = await _fixture.Client.SendAsync(createEvtReq);
+        var evt = await createEvtRes.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = evt.GetProperty("id").GetString();
+
+        // Update with EndTime before StartTime -> 400
+        using var updateReq = new HttpRequestMessage(HttpMethod.Put, $"{ClubsUrl}/{clubId}/events/{eventId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Quantum Mechanics",
+                startTimeUtc = start.AddHours(2),
+                endTimeUtc = start
+            })
+        };
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var updateRes = await _fixture.Client.SendAsync(updateReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateClubEvent_WhenCallerIsAdmin_Returns200OK_AndUpdatesEventDetails()
+    {
+        var adminToken = await RegisterAndLoginAsync("update-evt-success");
+
+        // 1. Create club
+        using var createClubReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Robotics Team" })
+        };
+        createClubReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createClubRes = await _fixture.Client.SendAsync(createClubReq);
+        var created = await createClubRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        // 2. Create initial event
+        var initialStart = DateTimeOffset.UtcNow.AddDays(7);
+        var initialEnd = initialStart.AddHours(2);
+        using var createEvtReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Autonomous Drone Test",
+                description = "Initial flight calibration in the field.",
+                location = "North Field",
+                startTimeUtc = initialStart,
+                endTimeUtc = initialEnd
+            })
+        };
+        createEvtReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createEvtRes = await _fixture.Client.SendAsync(createEvtReq);
+        Assert.Equal(HttpStatusCode.Created, createEvtRes.StatusCode);
+        var createdEvt = await createEvtRes.Content.ReadFromJsonAsync<JsonElement>();
+        var eventId = createdEvt.GetProperty("id").GetString();
+
+        // 3. Update event details as Admin
+        var updatedStart = DateTimeOffset.UtcNow.AddDays(8);
+        var updatedEnd = updatedStart.AddHours(3);
+        using var updateReq = new HttpRequestMessage(HttpMethod.Put, $"{ClubsUrl}/{clubId}/events/{eventId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Advanced Autonomous Drone Test",
+                description = "Full obstacle avoidance flight calibration.",
+                location = "South Aeronautics Hangar",
+                startTimeUtc = updatedStart,
+                endTimeUtc = updatedEnd
+            })
+        };
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var updateRes = await _fixture.Client.SendAsync(updateReq);
+
+        Assert.Equal(HttpStatusCode.OK, updateRes.StatusCode);
+        var updatedEvt = await updateRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(eventId, updatedEvt.GetProperty("id").GetString());
+        Assert.Equal("Advanced Autonomous Drone Test", updatedEvt.GetProperty("title").GetString());
+        Assert.Equal("Full obstacle avoidance flight calibration.", updatedEvt.GetProperty("description").GetString());
+        Assert.Equal("South Aeronautics Hangar", updatedEvt.GetProperty("location").GetString());
+        Assert.Equal(updatedStart, updatedEvt.GetProperty("startTimeUtc").GetDateTimeOffset());
+        Assert.Equal(updatedEnd, updatedEvt.GetProperty("endTimeUtc").GetDateTimeOffset());
+    }
 }
