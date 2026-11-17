@@ -357,4 +357,157 @@ describe('ClubCalendarGrid', () => {
     expect(screen.getByTestId('calendar-success-banner')).toHaveTextContent(/Hackathon 2026/i)
     expect(onEventCreated).toHaveBeenCalledWith(createdMockEvent)
   })
+
+  // ========================================================
+  // INC-25: Complete Event Details & Edit Event for Club Admin
+  // ========================================================
+
+  it('displays complete event details in modal when event pill is clicked', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={false}
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    expect(screen.getByTestId('calendar-event-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-modal-title')).toHaveTextContent('Robotics Workshop')
+    expect(screen.getByTestId('calendar-modal-location')).toHaveTextContent('Science Lab 4B')
+    expect(screen.getByTestId('calendar-modal-description')).toHaveTextContent('Hands-on Arduino workshop for freshmen.')
+    expect(screen.getByTestId('calendar-modal-time')).toBeInTheDocument()
+
+    // Non-admin should NOT see the edit button
+    expect(screen.queryByTestId('calendar-modal-edit-btn')).not.toBeInTheDocument()
+
+    // Close button dismisses the modal
+    await user.click(screen.getByTestId('calendar-modal-close-btn'))
+    expect(screen.queryByTestId('calendar-event-modal')).not.toBeInTheDocument()
+  })
+
+  it('shows Edit button for club admin and transitions to pre-filled edit form', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+
+    const editBtn = screen.getByTestId('calendar-modal-edit-btn')
+    expect(editBtn).toBeInTheDocument()
+
+    await user.click(editBtn)
+
+    expect(screen.getByTestId('edit-event-form')).toBeInTheDocument()
+    expect(screen.getByTestId('edit-event-title-input')).toHaveValue('Robotics Workshop')
+    expect(screen.getByTestId('edit-event-location-input')).toHaveValue('Science Lab 4B')
+    expect(screen.getByTestId('edit-event-description-input')).toHaveValue('Hands-on Arduino workshop for freshmen.')
+
+    // Cancel edit reverts to details view
+    await user.click(screen.getByTestId('edit-event-cancel-btn'))
+    expect(screen.queryByTestId('edit-event-form')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-modal-title')).toHaveTextContent('Robotics Workshop')
+  })
+
+  it('validates empty title and invalid date range when editing event', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+    await user.click(screen.getByTestId('calendar-modal-edit-btn'))
+
+    // 1. Empty title validation
+    fireEvent.change(screen.getByTestId('edit-event-title-input'), { target: { value: '   ' } })
+    await user.click(screen.getByTestId('edit-event-submit-btn'))
+
+    expect(screen.getByTestId('edit-event-error')).toBeInTheDocument()
+    expect(screen.getByTestId('edit-event-error')).toHaveTextContent(/Event title is required|Titel van evenement is verplicht/i)
+
+    // 2. End time before start time validation
+    fireEvent.change(screen.getByTestId('edit-event-title-input'), { target: { value: 'Updated Workshop' } })
+    fireEvent.change(screen.getByTestId('edit-event-start-time-input'), { target: { value: '2026-11-18T16:00' } })
+    fireEvent.change(screen.getByTestId('edit-event-end-time-input'), { target: { value: '2026-11-18T14:00' } })
+    await user.click(screen.getByTestId('edit-event-submit-btn'))
+
+    expect(screen.getByTestId('edit-event-error')).toBeInTheDocument()
+    expect(screen.getByTestId('edit-event-error')).toHaveTextContent(/End time must be after start time|Eindtijd moet na de starttijd liggen/i)
+  })
+
+  it('submits updated event details and triggers onEventUpdated callback on success', async () => {
+    const user = userEvent.setup()
+    const onEventUpdated = vi.fn()
+
+    const updatedMockEvent: ClubEventDto = {
+      id: 'evt-1',
+      clubId: 'club-123',
+      title: 'Advanced Robotics Workshop & AI Lab',
+      description: 'Upgraded curriculum with machine learning modules.',
+      location: 'Innovation Hub Room 101',
+      startTimeUtc: '2026-11-18T13:00:00.000Z',
+      endTimeUtc: '2026-11-18T17:00:00.000Z',
+      createdByMemberId: 'mem-admin',
+      createdAtUtc: '2026-11-01T10:00:00Z',
+    }
+
+    const updateEventFn = vi.fn().mockResolvedValue(updatedMockEvent)
+
+    render(
+      <ClubCalendarGrid
+        events={sampleEvents}
+        clubName="Robotics Club"
+        initialDate={fixedDate}
+        isAdmin={true}
+        clubId="club-123"
+        token="admin-token"
+        onEventUpdated={onEventUpdated}
+        updateEventFn={updateEventFn}
+      />
+    )
+
+    await user.click(screen.getByTestId('calendar-event-evt-1'))
+    await user.click(screen.getByTestId('calendar-modal-edit-btn'))
+
+    fireEvent.change(screen.getByTestId('edit-event-title-input'), { target: { value: 'Advanced Robotics Workshop & AI Lab' } })
+    fireEvent.change(screen.getByTestId('edit-event-location-input'), { target: { value: 'Innovation Hub Room 101' } })
+    fireEvent.change(screen.getByTestId('edit-event-description-input'), { target: { value: 'Upgraded curriculum with machine learning modules.' } })
+
+    await user.click(screen.getByTestId('edit-event-submit-btn'))
+
+    expect(updateEventFn).toHaveBeenCalledTimes(1)
+    expect(updateEventFn).toHaveBeenCalledWith(
+      'club-123',
+      'evt-1',
+      expect.objectContaining({
+        title: 'Advanced Robotics Workshop & AI Lab',
+        location: 'Innovation Hub Room 101',
+        description: 'Upgraded curriculum with machine learning modules.',
+      }),
+      'admin-token'
+    )
+
+    expect(screen.queryByTestId('calendar-event-modal')).not.toBeInTheDocument()
+    expect(screen.getByTestId('calendar-success-banner')).toHaveTextContent(/Advanced Robotics Workshop & AI Lab/i)
+    expect(onEventUpdated).toHaveBeenCalledWith(updatedMockEvent)
+  })
 })

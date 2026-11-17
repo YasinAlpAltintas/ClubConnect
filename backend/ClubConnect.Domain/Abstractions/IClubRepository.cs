@@ -176,4 +176,21 @@ public interface IClubRepository
     Task<ClubEvent> CreateEventAsync(
         ClubEvent clubEvent,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves a specific event by its ID within a club workspace.
+    /// Returns <c>null</c> if the event does not exist or does not belong to the club.
+    /// </summary>
+    Task<ClubEvent?> GetEventByIdAsync(
+        Guid clubId,
+        Guid eventId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates an existing scheduled event in a club workspace.
+    /// Returns the updated event, or <c>null</c> if the event was not found.
+    /// </summary>
+    Task<ClubEvent?> UpdateEventAsync(
+        ClubEvent clubEvent,
+        CancellationToken cancellationToken);
 }

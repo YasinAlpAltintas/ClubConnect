@@ -704,3 +704,43 @@ export async function createClubEvent(
 
   return (await res.json()) as ClubEventDto
 }
+
+export interface UpdateClubEventPayload {
+  title: string
+  description?: string
+  location?: string
+  startTimeUtc: string
+  endTimeUtc: string
+}
+
+export async function updateClubEvent(
+  clubId: string,
+  eventId: string,
+  payload: UpdateClubEventPayload,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubEventDto> {
+  const res = await fetchFn(`/api/clubs/${clubId}/events/${eventId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    let errorDetail = `Failed to update club event (${res.status})`
+    try {
+      const data = await res.json()
+      if (data?.detail) errorDetail = data.detail
+    } catch {
+      // ignore
+    }
+    const error = new Error(errorDetail) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubEventDto
+}

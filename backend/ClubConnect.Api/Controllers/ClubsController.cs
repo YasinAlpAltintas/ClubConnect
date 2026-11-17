@@ -21,7 +21,8 @@ public class ClubsController(
     UpdateMemberRoleUseCase? updateMemberRoleUseCase = null,
     RemoveClubMemberUseCase? removeClubMemberUseCase = null,
     GetClubEventsUseCase? getClubEventsUseCase = null,
-    CreateClubEventUseCase? createClubEventUseCase = null) : ControllerBase
+    CreateClubEventUseCase? createClubEventUseCase = null,
+    UpdateClubEventUseCase? updateClubEventUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -618,6 +619,91 @@ public class ClubsController(
             CreateClubEventStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             CreateClubEventStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "creation_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>Request body for <c>PUT /api/clubs/{id}/events/{eventId}</c> (INC-25).</summary>
+    public sealed record UpdateClubEventRequest(
+        [property: JsonPropertyName("title")] string? Title,
+        [property: JsonPropertyName("description")] string? Description,
+        [property: JsonPropertyName("location")] string? Location,
+        [property: JsonPropertyName("startTimeUtc")] DateTimeOffset StartTimeUtc,
+        [property: JsonPropertyName("endTimeUtc")] DateTimeOffset EndTimeUtc);
+
+    /// <summary>
+    /// Updates a scheduled event in the club workspace (INC-25).
+    /// Enforces multi-tenant authorization: only authenticated Club Admins of the club can update events.
+    /// 200 → updated event · 400 → validation error · 401 → unauthenticated · 403 → forbidden · 404 → club or event not found.
+    /// </summary>
+    [HttpPut("{id:guid}/events/{eventId:guid}")]
+    [ProducesResponseType(typeof(ClubEventResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateClubEvent(
+        [FromRoute] Guid id,
+        [FromRoute] Guid eventId,
+        [FromBody] UpdateClubEventRequest request,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (updateClubEventUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Event update service is unavailable." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { error = "invalid_input", detail = "Request body is required." });
+        }
+
+        var command = new UpdateClubEventCommand(
+            ClubId: id,
+            EventId: eventId,
+            AdminMemberId: validation.MemberId.Value,
+            Title: request.Title ?? string.Empty,
+            Description: request.Description,
+            Location: request.Location,
+            StartTimeUtc: request.StartTimeUtc,
+            EndTimeUtc: request.EndTimeUtc);
+
+        var outcome = await updateClubEventUseCase.ExecuteAsync(command, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            UpdateClubEventStatus.Success => Ok(new ClubEventResponse(
+                outcome.Event!.Id,
+                outcome.Event.ClubId,
+                outcome.Event.Title,
+                outcome.Event.Description,
+                outcome.Event.Location,
+                outcome.Event.StartTimeUtc,
+                outcome.Event.EndTimeUtc,
+                outcome.Event.CreatedByMemberId,
+                outcome.Event.CreatedAtUtc)),
+            UpdateClubEventStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.ErrorMessage }),
+            UpdateClubEventStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.ErrorMessage }),
+            UpdateClubEventStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.ErrorMessage }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "update_failed", detail = outcome.ErrorMessage })
         };
     }
 }
