@@ -160,7 +160,7 @@
   "dashboard": {
     "title": "Club Dashboard",
     "badge": "Club Workspace",
-    "backToLobby": "← Back to Lobby",
+    "backToLobby": "Back to Lobby",
     "accessDenied": "Access Denied",
     "accessDeniedMessage": "You do not have access to this club or you are not a member.",
     "roleAdmin": "Club Admin",

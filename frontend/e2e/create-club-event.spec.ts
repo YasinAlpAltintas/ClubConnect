@@ -191,10 +191,11 @@ test.describe('INC-24: Schedule Club Activities ("New Event" Form for Club Admin
 
     // 11. Verify modal closes and event badge appears on the calendar grid
     await expect(page.getByTestId('new-event-modal')).not.toBeVisible()
-    await expect(page.getByText('Annual Robotics Showcase')).toBeVisible()
+    const eventBadge = page.getByTestId('calendar-grid').getByText('Annual Robotics Showcase')
+    await expect(eventBadge).toBeVisible()
 
     // 12. Click event badge to open details dialog
-    await page.getByText('Annual Robotics Showcase').click()
+    await eventBadge.click()
     await expect(page.getByTestId('calendar-event-modal')).toBeVisible()
     await expect(page.getByTestId('calendar-modal-title')).toHaveText('Annual Robotics Showcase')
     await expect(page.getByTestId('calendar-modal-location')).toHaveText('Auditorium North')
@@ -217,7 +218,7 @@ test.describe('INC-24: Schedule Club Activities ("New Event" Form for Club Admin
     await page.getByTestId('dashboard-calendar-btn').click()
 
     // 16. Verify Member sees the event badge scheduled by Admin
-    await expect(page.getByText('Annual Robotics Showcase')).toBeVisible()
+    await expect(page.getByTestId('calendar-grid').getByText('Annual Robotics Showcase')).toBeVisible()
 
     // 17. Verify Member DOES NOT see "+ New Event" button
     await expect(page.getByTestId('calendar-new-event-btn')).not.toBeVisible()

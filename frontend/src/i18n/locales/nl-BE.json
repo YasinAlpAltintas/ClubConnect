@@ -160,7 +160,7 @@
   "dashboard": {
     "title": "Club Dashboard",
     "badge": "Club Werkruimte",
-    "backToLobby": "← Terug naar Lobby",
+    "backToLobby": "Terug naar Lobby",
     "accessDenied": "Toegang geweigerd",
     "accessDeniedMessage": "Je hebt geen toegang tot deze club of je bent geen lid.",
     "roleAdmin": "Clubbeheerder",

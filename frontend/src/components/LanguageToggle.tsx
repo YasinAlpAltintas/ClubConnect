@@ -25,11 +25,8 @@ export default function LanguageToggle({
       onClick={toggleLanguage}
       aria-label={t('header.languageToggle')}
       title={t('header.languageToggle')}
-      className={`btn-tactile inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors ${className}`}
+      className={`btn-tactile inline-flex items-center rounded-xl px-2.5 py-1.5 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors ${className}`}
     >
-      <span className="text-base leading-none select-none" aria-hidden="true">
-        {isDutch ? '🇬🇧' : '🇳🇱'}
-      </span>
       <span className="font-medium">{t('header.languageToggle')}</span>
     </button>
   )

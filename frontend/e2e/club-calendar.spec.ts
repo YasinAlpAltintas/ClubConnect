@@ -140,8 +140,8 @@ test.describe('INC-23: View Monthly Calendar Grid', () => {
     await expect(page.getByTestId('dashboard-club-name')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`.*#dashboard/${club.id}`))
 
-    // 11. Navigate to Calendar via top header nav button
-    await page.getByTestId('dashboard-calendar-nav-btn').click()
+    // 11. Navigate to Calendar via overview module button
+    await page.getByTestId('dashboard-calendar-btn').click()
     await expect(page.getByTestId('calendar-page-heading')).toBeVisible()
 
     // 12. Return to Dashboard Overview via header button
