@@ -264,7 +264,20 @@
       "location": "Location",
       "time": "Time",
       "description": "Description",
-      "close": "Close"
+      "close": "Close",
+      "edit": "Edit Event",
+      "editTitle": "Edit Event Details",
+      "editSubtitle": "Update title, schedule, or location for this club activity.",
+      "save": "Save Changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "editSuccessNotice": "Event details for \"{{title}}\" updated successfully!",
+      "errors": {
+        "titleRequired": "Event title is required.",
+        "titleTooLong": "Event title cannot exceed 100 characters.",
+        "datesInvalid": "End time must be after start time.",
+        "generic": "Failed to update event details. Please try again."
+      }
     },
     "newEvent": {
       "button": "New Event",

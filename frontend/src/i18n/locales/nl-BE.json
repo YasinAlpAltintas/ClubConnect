@@ -264,7 +264,20 @@
       "location": "Locatie",
       "time": "Tijdstip",
       "description": "Beschrijving",
-      "close": "Sluiten"
+      "close": "Sluiten",
+      "edit": "Evenement Bewerken",
+      "editTitle": "Evenementdetails Bewerken",
+      "editSubtitle": "Werk de titel, planning of locatie voor deze activiteit bij.",
+      "save": "Wijzigingen Opslaan",
+      "saving": "Bezig met opslaan…",
+      "cancel": "Annuleren",
+      "editSuccessNotice": "Evenementdetails voor \"{{title}}\" succesvol bijgewerkt!",
+      "errors": {
+        "titleRequired": "Titel van evenement is verplicht.",
+        "titleTooLong": "Titel mag niet langer zijn dan 100 tekens.",
+        "datesInvalid": "Eindtijd moet na de starttijd liggen.",
+        "generic": "Kon evenementdetails niet bijwerken. Probeer het opnieuw."
+      }
     },
     "newEvent": {
       "button": "Nieuw Evenement",
