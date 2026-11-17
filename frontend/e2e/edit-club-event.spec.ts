@@ -85,7 +85,7 @@ test.describe('INC-25: Complete Event Details (Validation & Edit Event for Club 
     expect(strangerEditRes.status()).toBe(403)
 
     // 8. Non-existent event ID -> 404 Not Found
-    const notFoundEventRes = await request.put(`/api/clubs/${club.id}/events/00000000-0000-0000-0000-000000000000`, {
+    const notFoundEventRes = await request.put(`/api/clubs/${club.id}/events/99999999-9999-9999-9999-999999999999`, {
       headers: { Authorization: `Bearer ${adminToken}` },
       data: {
         title: 'Ghost Event',
@@ -94,6 +94,17 @@ test.describe('INC-25: Complete Event Details (Validation & Edit Event for Club 
       },
     })
     expect(notFoundEventRes.status()).toBe(404)
+
+    // 8b. Empty event GUID -> 400 Bad Request
+    const emptyGuidRes = await request.put(`/api/clubs/${club.id}/events/00000000-0000-0000-0000-000000000000`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      data: {
+        title: 'Empty Guid Event',
+        startTimeUtc: validStart,
+        endTimeUtc: validEnd,
+      },
+    })
+    expect(emptyGuidRes.status()).toBe(400)
 
     // 9. Admin invalid dates (endTime <= startTime) -> 400 Bad Request
     const invalidDatesRes = await request.put(`/api/clubs/${club.id}/events/${event.id}`, {
