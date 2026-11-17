@@ -487,7 +487,7 @@ public class ClubsController(
         var attendeeList = (e.Attendees ?? Array.Empty<ClubEventAttendee>())
             .Select(a => new ClubEventAttendeeResponse(
                 a.MemberId,
-                string.IsNullOrWhiteSpace(a.Member?.DisplayName) ? "Club Member" : a.Member.DisplayName,
+                string.IsNullOrWhiteSpace(a.Member?.DisplayName) ? string.Empty : a.Member.DisplayName,
                 a.Member?.Email ?? string.Empty,
                 a.RsvpAtUtc))
             .ToList();

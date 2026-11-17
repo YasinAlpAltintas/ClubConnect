@@ -888,9 +888,9 @@ export default function ClubCalendarGrid({
                             className="flex items-center space-x-2 text-xs py-0.5"
                           >
                             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-aurora-elevated text-[10px] font-bold text-aurora-primary ring-1 ring-aurora-border">
-                              {att.displayName ? att.displayName.charAt(0).toUpperCase() : 'M'}
+                              {((att.displayName?.trim() || att.email || 'M')[0] || 'M').toUpperCase()}
                             </span>
-                            <span className="font-medium text-aurora-text">{att.displayName || att.email}</span>
+                            <span className="font-medium text-aurora-text">{att.displayName?.trim() || att.email}</span>
                           </div>
                         ))}
                       </div>

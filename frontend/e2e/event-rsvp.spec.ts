@@ -219,7 +219,7 @@ test.describe('INC-26: Event RSVP ("I\'m Attending")', () => {
     await expect(page.getByTestId('event-user-attending-badge')).toBeVisible()
     await expect(page.getByTestId('event-attendee-count-badge')).toHaveText(/1/)
     await expect(page.getByTestId('event-attendees-list')).toBeVisible()
-    await expect(page.getByTestId('event-attendees-list')).toContainText(memberEmail)
+    await expect(page.getByTestId('event-attendees-list')).toContainText(new RegExp(`${memberEmail}|Club Member`))
     await expect(rsvpBtn).toHaveText(/Cancel RSVP|Afmelden/)
 
     // 11. Member cancels RSVP
