@@ -304,6 +304,19 @@
         "datesInvalid": "End time must be after start time.",
         "generic": "Failed to schedule event. Please try again."
       }
+    },
+    "rsvp": {
+      "attending": "I'm Attending",
+      "cancel": "Cancel RSVP",
+      "youAreAttending": "You're attending",
+      "attendeesTitle": "Attendees",
+      "attendeeCount": "{{count}} attending",
+      "attendeeCount_one": "1 attending",
+      "attendeeCount_other": "{{count}} attending",
+      "noAttendees": "No attendees yet. Be the first to join!",
+      "successAttending": "You are now attending this event!",
+      "successCancelled": "You have cancelled your attendance for this event.",
+      "error": "Failed to update RSVP. Please try again."
     }
   },
   "onboarding": {
