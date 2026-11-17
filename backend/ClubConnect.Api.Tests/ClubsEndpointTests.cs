@@ -790,4 +790,195 @@ public class ClubsEndpointTests : IClassFixture<ApiTestFixture>
         var events = await getRes.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(JsonValueKind.Array, events.ValueKind);
     }
+
+    [Fact]
+    public async Task CreateClubEvent_WithoutToken_Returns401Unauthorized()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{Guid.NewGuid()}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Meeting",
+                startTimeUtc = DateTimeOffset.UtcNow,
+                endTimeUtc = DateTimeOffset.UtcNow.AddHours(1)
+            })
+        };
+        using var response = await _fixture.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateClubEvent_WhenClubDoesNotExist_Returns404NotFound()
+    {
+        var token = await RegisterAndLoginAsync("event-create-notfound");
+        var nonExistentClubId = Guid.NewGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{nonExistentClubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Meeting",
+                startTimeUtc = DateTimeOffset.UtcNow.AddDays(1),
+                endTimeUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(1)
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateClubEvent_WhenCallerIsOrdinaryMember_Returns403Forbidden()
+    {
+        var adminToken = await RegisterAndLoginAsync("event-admin-creator");
+        var memberToken = await RegisterAndLoginAsync("event-normal-member");
+
+        // 1. Admin creates club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Design Society" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+        var inviteCode = created.GetProperty("inviteCode").GetString();
+
+        // 2. Member joins club
+        using var joinReq = new HttpRequestMessage(HttpMethod.Post, JoinClubUrl)
+        {
+            Content = JsonContent.Create(new { code = inviteCode })
+        };
+        joinReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var joinRes = await _fixture.Client.SendAsync(joinReq);
+        Assert.Equal(HttpStatusCode.OK, joinRes.StatusCode);
+
+        // 3. Ordinary member attempts to create an event
+        using var postEventReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Unauthorized Party",
+                startTimeUtc = DateTimeOffset.UtcNow.AddDays(2),
+                endTimeUtc = DateTimeOffset.UtcNow.AddDays(2).AddHours(3)
+            })
+        };
+        postEventReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", memberToken);
+        using var postEventRes = await _fixture.Client.SendAsync(postEventReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, postEventRes.StatusCode);
+        var body = await postEventRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("forbidden", body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task CreateClubEvent_WithInvalidDates_Returns400BadRequest()
+    {
+        var adminToken = await RegisterAndLoginAsync("event-bad-dates");
+
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Science Club" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        var now = DateTimeOffset.UtcNow;
+        using var postEventReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Invalid Timing Workshop",
+                startTimeUtc = now.AddHours(2),
+                endTimeUtc = now.AddHours(1)
+            })
+        };
+        postEventReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var postEventRes = await _fixture.Client.SendAsync(postEventReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, postEventRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateClubEvent_WithEmptyTitle_Returns400BadRequest()
+    {
+        var adminToken = await RegisterAndLoginAsync("event-empty-title");
+
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Astronomy Club" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        using var postEventReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "   ",
+                startTimeUtc = DateTimeOffset.UtcNow.AddDays(1),
+                endTimeUtc = DateTimeOffset.UtcNow.AddDays(1).AddHours(2)
+            })
+        };
+        postEventReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var postEventRes = await _fixture.Client.SendAsync(postEventReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, postEventRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateClubEvent_WhenCallerIsAdmin_Returns201Created_AndEventAppearsInGetEvents()
+    {
+        var adminToken = await RegisterAndLoginAsync("event-admin-success");
+
+        // 1. Create club
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, ClubsUrl)
+        {
+            Content = JsonContent.Create(new { name = "Math Olympiad" })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var createRes = await _fixture.Client.SendAsync(createReq);
+        var created = await createRes.Content.ReadFromJsonAsync<JsonElement>();
+        var clubId = created.GetProperty("id").GetString();
+
+        // 2. Schedule event as Admin
+        var start = DateTimeOffset.UtcNow.AddDays(5);
+        var end = start.AddHours(3);
+
+        using var postEventReq = new HttpRequestMessage(HttpMethod.Post, $"{ClubsUrl}/{clubId}/events")
+        {
+            Content = JsonContent.Create(new
+            {
+                title = "Calculus Marathon",
+                description = "Solving advanced differentiation and integration problems.",
+                location = "Auditorium A",
+                startTimeUtc = start,
+                endTimeUtc = end
+            })
+        };
+        postEventReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var postEventRes = await _fixture.Client.SendAsync(postEventReq);
+
+        Assert.Equal(HttpStatusCode.Created, postEventRes.StatusCode);
+        var createdEvent = await postEventRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Calculus Marathon", createdEvent.GetProperty("title").GetString());
+        Assert.Equal("Auditorium A", createdEvent.GetProperty("location").GetString());
+        Assert.Equal("Solving advanced differentiation and integration problems.", createdEvent.GetProperty("description").GetString());
+
+        // 3. Verify event appears in GET /api/clubs/{id}/events
+        using var getEventsReq = new HttpRequestMessage(HttpMethod.Get, $"{ClubsUrl}/{clubId}/events");
+        getEventsReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        using var getEventsRes = await _fixture.Client.SendAsync(getEventsReq);
+
+        Assert.Equal(HttpStatusCode.OK, getEventsRes.StatusCode);
+        var eventsList = await getEventsRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(JsonValueKind.Array, eventsList.ValueKind);
+        Assert.True(eventsList.GetArrayLength() >= 1);
+    }
 }
