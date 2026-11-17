@@ -380,6 +380,13 @@ export async function removeClubMember(
   }
 }
 
+export interface ClubEventAttendeeDto {
+  memberId: string
+  displayName: string
+  email: string
+  rsvpAtUtc: string
+}
+
 export interface ClubEventDto {
   id: string
   clubId: string
@@ -390,6 +397,9 @@ export interface ClubEventDto {
   endTimeUtc: string
   createdByMemberId: string
   createdAtUtc: string
+  attendeeCount?: number
+  isAttending?: boolean
+  attendees?: ClubEventAttendeeDto[]
 }
 
 export async function getClubEvents(
@@ -731,6 +741,38 @@ export async function updateClubEvent(
 
   if (!res.ok) {
     let errorDetail = `Failed to update club event (${res.status})`
+    try {
+      const data = await res.json()
+      if (data?.detail) errorDetail = data.detail
+    } catch {
+      // ignore
+    }
+    const error = new Error(errorDetail) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubEventDto
+}
+
+export async function setEventRsvp(
+  clubId: string,
+  eventId: string,
+  isAttending: boolean,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubEventDto> {
+  const res = await fetchFn(`/api/clubs/${clubId}/events/${eventId}/rsvp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ isAttending }),
+  })
+
+  if (!res.ok) {
+    let errorDetail = `Failed to update RSVP (${res.status})`
     try {
       const data = await res.json()
       if (data?.detail) errorDetail = data.detail

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type ClubEventDto, createClubEvent, updateClubEvent } from '../lib/api'
+import { type ClubEventDto, createClubEvent, updateClubEvent, setEventRsvp } from '../lib/api'
 
 export interface ClubCalendarGridProps {
   events: ClubEventDto[]
@@ -16,8 +16,10 @@ export interface ClubCalendarGridProps {
   onSelectEvent?: (event: ClubEventDto) => void
   onEventCreated?: (event: ClubEventDto) => void
   onEventUpdated?: (event: ClubEventDto) => void
+  onEventRsvp?: (event: ClubEventDto) => void
   createEventFn?: typeof createClubEvent
   updateEventFn?: typeof updateClubEvent
+  rsvpEventFn?: typeof setEventRsvp
 }
 
 export default function ClubCalendarGrid({
@@ -34,8 +36,10 @@ export default function ClubCalendarGrid({
   onSelectEvent,
   onEventCreated,
   onEventUpdated,
+  onEventRsvp,
   createEventFn = createClubEvent,
   updateEventFn = updateClubEvent,
+  rsvpEventFn = setEventRsvp,
 }: ClubCalendarGridProps) {
   const { t, i18n } = useTranslation()
   const [currentDate, setCurrentDate] = useState<Date>(() => initialDate ?? new Date())
@@ -61,6 +65,10 @@ export default function ClubCalendarGrid({
   const [editEndTime, setEditEndTime] = useState('')
   const [editFormError, setEditFormError] = useState<string | null>(null)
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
+
+  // INC-26: RSVP state
+  const [isRsvpSubmitting, setIsRsvpSubmitting] = useState(false)
+  const [rsvpError, setRsvpError] = useState<string | null>(null)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() // 0-indexed (0 = Jan, 11 = Dec)
@@ -257,7 +265,34 @@ export default function ClubCalendarGrid({
     setSelectedEvent(event)
     setIsEditingEvent(false)
     setEditFormError(null)
+    setRsvpError(null)
     onSelectEvent?.(event)
+  }
+
+  async function handleToggleRsvp() {
+    if (!clubId || !selectedEvent) return
+    setIsRsvpSubmitting(true)
+    setRsvpError(null)
+
+    const nextIsAttending = !selectedEvent.isAttending
+
+    try {
+      const runner = rsvpEventFn || setEventRsvp
+      const updated = await runner(clubId, selectedEvent.id, nextIsAttending, token)
+      setSelectedEvent(updated)
+      setSuccessBanner(
+        nextIsAttending
+          ? t('calendar.rsvp.successAttending', 'You are now attending this event!')
+          : t('calendar.rsvp.successCancelled', 'You have cancelled your attendance.')
+      )
+      setTimeout(() => setSuccessBanner(null), 4000)
+      onEventRsvp?.(updated)
+      onEventUpdated?.(updated)
+    } catch (err) {
+      setRsvpError(err instanceof Error ? err.message : t('calendar.rsvp.error', 'Failed to update RSVP. Please try again.'))
+    } finally {
+      setIsRsvpSubmitting(false)
+    }
   }
 
   function toDateTimeLocalValue(isoString: string): string {
@@ -546,6 +581,14 @@ export default function ClubCalendarGrid({
                       >
                         <span className="font-semibold mr-1">{formatTime(evt.startTimeUtc)}</span>
                         <span>{evt.title}</span>
+                        {evt.isAttending && (
+                          <span
+                            className="ml-1 text-[10px] text-emerald-400 font-bold"
+                            title={t('calendar.rsvp.youAreAttending', "You're attending")}
+                          >
+                            ✓
+                          </span>
+                        )}
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
@@ -799,6 +842,27 @@ export default function ClubCalendarGrid({
                     </div>
                   )}
 
+                  {/* INC-26: Attendance count and status badges */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span
+                      data-testid="event-attendee-count-badge"
+                      className="inline-flex items-center gap-1 rounded-full bg-aurora-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-aurora-primary ring-1 ring-aurora-primary/20"
+                    >
+                      👥 {t('calendar.rsvp.attendeeCount', {
+                        count: selectedEvent.attendeeCount ?? selectedEvent.attendees?.length ?? 0,
+                        defaultValue: `${selectedEvent.attendeeCount ?? selectedEvent.attendees?.length ?? 0} attending`
+                      })}
+                    </span>
+                    {selectedEvent.isAttending && (
+                      <span
+                        data-testid="event-user-attending-badge"
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20"
+                      >
+                        ✓ {t('calendar.rsvp.youAreAttending', "You're attending")}
+                      </span>
+                    )}
+                  </div>
+
                   {selectedEvent.description && (
                     <div className="pt-2 border-t border-aurora-border/60">
                       <p className="text-[11px] font-semibold text-aurora-text-muted uppercase tracking-wider mb-1">
@@ -809,9 +873,63 @@ export default function ClubCalendarGrid({
                       </p>
                     </div>
                   )}
+
+                  {/* INC-26: Attendees section */}
+                  <div data-testid="event-attendees-section" className="pt-2 border-t border-aurora-border/60">
+                    <p className="text-[11px] font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">
+                      {t('calendar.rsvp.attendeesTitle', 'Attendees')} ({selectedEvent.attendees?.length ?? selectedEvent.attendeeCount ?? 0})
+                    </p>
+                    {selectedEvent.attendees && selectedEvent.attendees.length > 0 ? (
+                      <div data-testid="event-attendees-list" className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        {selectedEvent.attendees.map((att) => (
+                          <div
+                            key={att.memberId}
+                            data-testid={`event-attendee-${att.memberId}`}
+                            className="flex items-center space-x-2 text-xs py-0.5"
+                          >
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-aurora-elevated text-[10px] font-bold text-aurora-primary ring-1 ring-aurora-border">
+                              {att.displayName ? att.displayName.charAt(0).toUpperCase() : 'M'}
+                            </span>
+                            <span className="font-medium text-aurora-text">{att.displayName || att.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-aurora-text-muted italic">
+                        {t('calendar.rsvp.noAttendees', 'No attendees yet. Be the first to join!')}
+                      </p>
+                    )}
+                  </div>
+
+                  {rsvpError && (
+                    <div
+                      data-testid="event-rsvp-error"
+                      className="mt-2 rounded-xl bg-red-500/10 px-3 py-1.5 text-xs text-red-400 ring-1 ring-red-500/20"
+                    >
+                      {rsvpError}
+                    </div>
+                  )}
                 </div>
 
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex items-center justify-between">
+                  <button
+                    type="button"
+                    data-testid="event-rsvp-btn"
+                    onClick={handleToggleRsvp}
+                    disabled={isRsvpSubmitting}
+                    className={`btn-tactile inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer transition-all ${
+                      selectedEvent.isAttending
+                        ? 'bg-aurora-elevated text-aurora-text ring-1 ring-aurora-border hover:bg-red-500/10 hover:text-red-400 hover:ring-red-500/30'
+                        : 'bg-aurora-primary text-white shadow-xs hover:bg-aurora-primary-hover'
+                    }`}
+                  >
+                    <span>{selectedEvent.isAttending ? '✕' : '✓'}</span>
+                    <span>
+                      {selectedEvent.isAttending
+                        ? t('calendar.rsvp.cancel', 'Cancel RSVP')
+                        : t('calendar.rsvp.attending', "I'm Attending")}
+                    </span>
+                  </button>
                   <button
                     type="button"
                     data-testid="calendar-modal-footer-close-btn"
