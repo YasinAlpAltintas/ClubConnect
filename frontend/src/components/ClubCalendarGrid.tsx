@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type ClubEventDto, createClubEvent } from '../lib/api'
+import { type ClubEventDto, createClubEvent, updateClubEvent } from '../lib/api'
 
 export interface ClubCalendarGridProps {
   events: ClubEventDto[]
@@ -15,7 +15,9 @@ export interface ClubCalendarGridProps {
   initialDate?: Date
   onSelectEvent?: (event: ClubEventDto) => void
   onEventCreated?: (event: ClubEventDto) => void
+  onEventUpdated?: (event: ClubEventDto) => void
   createEventFn?: typeof createClubEvent
+  updateEventFn?: typeof updateClubEvent
 }
 
 export default function ClubCalendarGrid({
@@ -31,7 +33,9 @@ export default function ClubCalendarGrid({
   initialDate,
   onSelectEvent,
   onEventCreated,
+  onEventUpdated,
   createEventFn = createClubEvent,
+  updateEventFn = updateClubEvent,
 }: ClubCalendarGridProps) {
   const { t, i18n } = useTranslation()
   const [currentDate, setCurrentDate] = useState<Date>(() => initialDate ?? new Date())
@@ -47,6 +51,16 @@ export default function ClubCalendarGrid({
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
+
+  // INC-25: Edit Event state
+  const [isEditingEvent, setIsEditingEvent] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editStartTime, setEditStartTime] = useState('')
+  const [editEndTime, setEditEndTime] = useState('')
+  const [editFormError, setEditFormError] = useState<string | null>(null)
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false)
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth() // 0-indexed (0 = Jan, 11 = Dec)
@@ -241,7 +255,93 @@ export default function ClubCalendarGrid({
   function handleEventClick(event: ClubEventDto, e: React.MouseEvent) {
     e.stopPropagation()
     setSelectedEvent(event)
+    setIsEditingEvent(false)
+    setEditFormError(null)
     onSelectEvent?.(event)
+  }
+
+  function toDateTimeLocalValue(isoString: string): string {
+    const d = new Date(isoString)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
+  function handleStartEdit() {
+    if (!selectedEvent) return
+    setEditTitle(selectedEvent.title)
+    setEditDescription(selectedEvent.description || '')
+    setEditLocation(selectedEvent.location || '')
+    setEditStartTime(toDateTimeLocalValue(selectedEvent.startTimeUtc))
+    setEditEndTime(toDateTimeLocalValue(selectedEvent.endTimeUtc))
+    setEditFormError(null)
+    setIsEditingEvent(true)
+  }
+
+  function handleCancelEdit() {
+    setIsEditingEvent(false)
+    setEditFormError(null)
+  }
+
+  async function handleEditEventSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setEditFormError(null)
+
+    const trimmedTitle = editTitle.trim()
+    if (!trimmedTitle) {
+      setEditFormError(t('calendar.eventDetails.errors.titleRequired', 'Event title is required.'))
+      return
+    }
+
+    if (trimmedTitle.length > 100) {
+      setEditFormError(t('calendar.eventDetails.errors.titleTooLong', 'Event title cannot exceed 100 characters.'))
+      return
+    }
+
+    if (!editStartTime || !editEndTime) {
+      setEditFormError(t('calendar.eventDetails.errors.datesInvalid', 'End time must be after start time.'))
+      return
+    }
+
+    const start = new Date(editStartTime)
+    const end = new Date(editEndTime)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+      setEditFormError(t('calendar.eventDetails.errors.datesInvalid', 'End time must be after start time.'))
+      return
+    }
+
+    if (!clubId || !selectedEvent) {
+      setEditFormError('Missing club or event identifier.')
+      return
+    }
+
+    setIsEditSubmitting(true)
+
+    try {
+      const runner = updateEventFn || updateClubEvent
+      const updated = await runner(
+        clubId,
+        selectedEvent.id,
+        {
+          title: trimmedTitle,
+          description: editDescription.trim() || undefined,
+          location: editLocation.trim() || undefined,
+          startTimeUtc: start.toISOString(),
+          endTimeUtc: end.toISOString(),
+        },
+        token,
+      )
+
+      setSelectedEvent(null)
+      setIsEditingEvent(false)
+      setSuccessBanner(t('calendar.eventDetails.editSuccessNotice', { title: updated.title, defaultValue: `Event details for "${updated.title}" updated successfully!` }))
+      setTimeout(() => setSuccessBanner(null), 4000)
+      onEventUpdated?.(updated)
+    } catch (err) {
+      setEditFormError(err instanceof Error ? err.message : t('calendar.eventDetails.errors.generic', 'Failed to update event details.'))
+    } finally {
+      setIsEditSubmitting(false)
+    }
   }
 
   const weekdays = [
@@ -472,7 +572,7 @@ export default function ClubCalendarGrid({
         </>
       )}
 
-      {/* Event Details Modal Dialog */}
+      {/* Event Details / Edit Modal Dialog */}
       {selectedEvent && (
         <div
           data-testid="calendar-event-modal"
@@ -481,73 +581,248 @@ export default function ClubCalendarGrid({
           aria-modal="true"
           aria-labelledby="event-dialog-title"
         >
-          <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border text-aurora-text animate-in fade-in-0 zoom-in-95 duration-150">
-            <div className="flex items-start justify-between">
+          <div className="w-full max-w-lg rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border text-aurora-text animate-in fade-in-0 zoom-in-95 duration-150">
+            {isEditingEvent ? (
               <div>
-                <span className="inline-flex items-center rounded-full bg-aurora-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-aurora-primary ring-1 ring-aurora-primary/20">
-                  {clubName}
-                </span>
-                <h3
-                  id="event-dialog-title"
-                  data-testid="calendar-modal-title"
-                  className="mt-2 text-xl font-bold tracking-tight text-aurora-text"
-                >
-                  {selectedEvent.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                data-testid="calendar-modal-close-btn"
-                onClick={() => setSelectedEvent(null)}
-                className="rounded-lg p-1 text-aurora-text-secondary hover:text-aurora-text cursor-pointer"
-                aria-label={t('calendar.eventDetails.close', 'Close')}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3 text-xs">
-              <div className="flex items-center space-x-2 text-aurora-text-secondary">
-                <svg className="h-4 w-4 text-aurora-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span data-testid="calendar-modal-time">
-                  {new Date(selectedEvent.startTimeUtc).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {formatTime(selectedEvent.startTimeUtc)} – {formatTime(selectedEvent.endTimeUtc)}
-                </span>
-              </div>
-
-              {selectedEvent.location && (
-                <div className="flex items-center space-x-2 text-aurora-text-secondary">
-                  <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span data-testid="calendar-modal-location">{selectedEvent.location}</span>
+                <div className="flex items-start justify-between pb-4 border-b border-aurora-border/60">
+                  <div>
+                    <h3
+                      id="event-dialog-title"
+                      data-testid="edit-event-modal-title"
+                      className="text-lg font-bold tracking-tight text-aurora-text"
+                    >
+                      {t('calendar.eventDetails.editTitle', 'Edit Event Details')}
+                    </h3>
+                    <p className="text-xs text-aurora-text-secondary mt-0.5">
+                      {t('calendar.eventDetails.editSubtitle', 'Update title, schedule, or location for this club activity.')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="edit-event-modal-close-btn"
+                    onClick={handleCancelEdit}
+                    className="rounded-lg p-1 text-aurora-text-secondary hover:text-aurora-text cursor-pointer"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
                 </div>
-              )}
 
-              {selectedEvent.description && (
-                <div className="pt-2 border-t border-aurora-border/60">
-                  <p className="text-[11px] font-semibold text-aurora-text-muted uppercase tracking-wider mb-1">
-                    {t('calendar.eventDetails.description', 'Description')}
-                  </p>
-                  <p data-testid="calendar-modal-description" className="text-aurora-text-secondary leading-relaxed">
-                    {selectedEvent.description}
-                  </p>
+                {editFormError && (
+                  <div
+                    data-testid="edit-event-error"
+                    className="mt-4 rounded-xl bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20"
+                  >
+                    {editFormError}
+                  </div>
+                )}
+
+                <form onSubmit={handleEditEventSubmit} data-testid="edit-event-form" noValidate className="mt-5 space-y-4">
+                  {/* Title */}
+                  <div>
+                    <label
+                      htmlFor="edit-event-title-input"
+                      className="block text-xs font-semibold text-aurora-text mb-1"
+                    >
+                      {t('calendar.newEvent.fields.title', 'Event Title')} *
+                    </label>
+                    <input
+                      id="edit-event-title-input"
+                      type="text"
+                      data-testid="edit-event-title-input"
+                      required
+                      maxLength={100}
+                      placeholder={t('calendar.newEvent.fields.titlePlaceholder', 'e.g. Weekly Strategy Meeting')}
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border placeholder:text-aurora-text-muted focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                    />
+                  </div>
+
+                  {/* Date & Time Range */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="edit-event-start-time-input"
+                        className="block text-xs font-semibold text-aurora-text mb-1"
+                      >
+                        {t('calendar.newEvent.fields.startTime', 'Start Date & Time')} *
+                      </label>
+                      <input
+                        id="edit-event-start-time-input"
+                        type="datetime-local"
+                        data-testid="edit-event-start-time-input"
+                        required
+                        value={editStartTime}
+                        onChange={(e) => setEditStartTime(e.target.value)}
+                        className="w-full rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="edit-event-end-time-input"
+                        className="block text-xs font-semibold text-aurora-text mb-1"
+                      >
+                        {t('calendar.newEvent.fields.endTime', 'End Date & Time')} *
+                      </label>
+                      <input
+                        id="edit-event-end-time-input"
+                        type="datetime-local"
+                        data-testid="edit-event-end-time-input"
+                        required
+                        value={editEndTime}
+                        onChange={(e) => setEditEndTime(e.target.value)}
+                        className="w-full rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <label
+                      htmlFor="edit-event-location-input"
+                      className="block text-xs font-semibold text-aurora-text mb-1"
+                    >
+                      {t('calendar.newEvent.fields.location', 'Location / Room')}
+                    </label>
+                    <input
+                      id="edit-event-location-input"
+                      type="text"
+                      data-testid="edit-event-location-input"
+                      maxLength={200}
+                      placeholder={t('calendar.newEvent.fields.locationPlaceholder', 'e.g. Campus Building B, Room 2.14')}
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      className="w-full rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border placeholder:text-aurora-text-muted focus:ring-2 focus:ring-aurora-primary focus:outline-hidden"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label
+                      htmlFor="edit-event-description-input"
+                      className="block text-xs font-semibold text-aurora-text mb-1"
+                    >
+                      {t('calendar.newEvent.fields.description', 'Description')}
+                    </label>
+                    <textarea
+                      id="edit-event-description-input"
+                      data-testid="edit-event-description-input"
+                      rows={3}
+                      maxLength={1000}
+                      placeholder={t('calendar.newEvent.fields.descriptionPlaceholder', 'Optional details, agenda, or materials to bring...')}
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full rounded-xl bg-aurora-elevated px-3.5 py-2 text-xs text-aurora-text ring-1 ring-aurora-border placeholder:text-aurora-text-muted focus:ring-2 focus:ring-aurora-primary focus:outline-hidden resize-none"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-aurora-border/60">
+                    <button
+                      type="button"
+                      data-testid="edit-event-cancel-btn"
+                      onClick={handleCancelEdit}
+                      disabled={isEditSubmitting}
+                      className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
+                    >
+                      {t('calendar.eventDetails.cancel', 'Cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      data-testid="edit-event-submit-btn"
+                      disabled={isEditSubmitting}
+                      className="btn-tactile rounded-xl bg-aurora-primary px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all"
+                    >
+                      {isEditSubmitting ? t('calendar.eventDetails.saving', 'Saving…') : t('calendar.eventDetails.save', 'Save Changes')}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-start justify-between">
+                  <div className="pr-4">
+                    <span className="inline-flex items-center rounded-full bg-aurora-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-aurora-primary ring-1 ring-aurora-primary/20">
+                      {clubName}
+                    </span>
+                    <h3
+                      id="event-dialog-title"
+                      data-testid="calendar-modal-title"
+                      className="mt-2 text-xl font-bold tracking-tight text-aurora-text"
+                    >
+                      {selectedEvent.title}
+                    </h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        data-testid="calendar-modal-edit-btn"
+                        onClick={handleStartEdit}
+                        className="btn-tactile inline-flex items-center gap-1.5 rounded-xl bg-aurora-elevated px-2.5 py-1 text-xs font-medium text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
+                        title={t('calendar.eventDetails.edit', 'Edit Event')}
+                      >
+                        <span aria-hidden="true">✏️</span>
+                        <span>{t('calendar.eventDetails.edit', 'Edit Event')}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      data-testid="calendar-modal-close-btn"
+                      onClick={() => setSelectedEvent(null)}
+                      className="rounded-lg p-1 text-aurora-text-secondary hover:text-aurora-text cursor-pointer"
+                      aria-label={t('calendar.eventDetails.close', 'Close')}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                data-testid="calendar-modal-footer-close-btn"
-                onClick={() => setSelectedEvent(null)}
-                className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
-              >
-                {t('calendar.eventDetails.close', 'Close')}
-              </button>
-            </div>
+                <div className="mt-4 space-y-3 text-xs">
+                  <div className="flex items-center space-x-2 text-aurora-text-secondary">
+                    <svg className="h-4 w-4 text-aurora-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span data-testid="calendar-modal-time">
+                      {new Date(selectedEvent.startTimeUtc).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {formatTime(selectedEvent.startTimeUtc)} – {formatTime(selectedEvent.endTimeUtc)}
+                    </span>
+                  </div>
+
+                  {selectedEvent.location && (
+                    <div className="flex items-center space-x-2 text-aurora-text-secondary">
+                      <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span data-testid="calendar-modal-location">{selectedEvent.location}</span>
+                    </div>
+                  )}
+
+                  {selectedEvent.description && (
+                    <div className="pt-2 border-t border-aurora-border/60">
+                      <p className="text-[11px] font-semibold text-aurora-text-muted uppercase tracking-wider mb-1">
+                        {t('calendar.eventDetails.description', 'Description')}
+                      </p>
+                      <p data-testid="calendar-modal-description" className="text-aurora-text-secondary leading-relaxed">
+                        {selectedEvent.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    data-testid="calendar-modal-footer-close-btn"
+                    onClick={() => setSelectedEvent(null)}
+                    className="btn-tactile rounded-xl bg-aurora-elevated px-4 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-border cursor-pointer transition-colors"
+                  >
+                    {t('calendar.eventDetails.close', 'Close')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

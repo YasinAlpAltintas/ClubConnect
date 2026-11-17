@@ -458,4 +458,37 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return clubEvent;
     }
+
+    public async Task<ClubEvent?> GetEventByIdAsync(
+        Guid clubId,
+        Guid eventId,
+        CancellationToken cancellationToken)
+    {
+        return await context.Events
+            .FirstOrDefaultAsync(e => e.ClubId == clubId && e.Id == eventId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<ClubEvent?> UpdateEventAsync(
+        ClubEvent clubEvent,
+        CancellationToken cancellationToken)
+    {
+        var existing = await context.Events
+            .FirstOrDefaultAsync(e => e.ClubId == clubEvent.ClubId && e.Id == clubEvent.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            return null;
+        }
+
+        existing.Title = clubEvent.Title;
+        existing.Description = clubEvent.Description;
+        existing.Location = clubEvent.Location;
+        existing.StartTimeUtc = clubEvent.StartTimeUtc;
+        existing.EndTimeUtc = clubEvent.EndTimeUtc;
+
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return existing;
+    }
 }

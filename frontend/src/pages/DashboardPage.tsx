@@ -615,6 +615,7 @@ export default function DashboardPage({
             token={member.token}
             isAdmin={currentClub?.role === 'Club Admin'}
             onEventCreated={() => void refetchEvents()}
+            onEventUpdated={() => void refetchEvents()}
           />
         </div>
       ) : (
