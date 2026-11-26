@@ -25,4 +25,7 @@ public class Club
 
     /// <summary>Scheduled events belonging to this club.</summary>
     public ICollection<ClubEvent> Events { get; set; } = new List<ClubEvent>();
+
+    /// <summary>Kanban tasks belonging to this club (INC-27).</summary>
+    public ICollection<ClubTask> Tasks { get; set; } = new List<ClubTask>();
 }

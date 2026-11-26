@@ -452,6 +452,19 @@ public sealed class ClubRepository(ClubConnectDbContext context) : IClubReposito
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<ClubTask>> GetTasksForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        return await context.Tasks
+            .AsNoTracking()
+            .Include(t => t.Assignee)
+            .Where(t => t.ClubId == clubId)
+            .OrderBy(t => t.CreatedAtUtc)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<ClubEvent> CreateEventAsync(
         ClubEvent clubEvent,
         CancellationToken cancellationToken)

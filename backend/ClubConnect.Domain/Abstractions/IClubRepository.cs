@@ -171,6 +171,14 @@ public interface IClubRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Retrieves all Kanban tasks of a specific club, including their assignee (INC-27).
+    /// Ordered by creation time, oldest first.
+    /// </summary>
+    Task<IReadOnlyList<ClubTask>> GetTasksForClubAsync(
+        Guid clubId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Adds a new scheduled event to a club workspace.
     /// </summary>
     Task<ClubEvent> CreateEventAsync(
