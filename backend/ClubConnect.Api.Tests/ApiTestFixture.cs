@@ -58,5 +58,8 @@ public sealed class ApiTestFixture : IDisposable
 
     public HttpClient Client => _factory.CreateClient();
 
+    /// <summary>Root service provider, used by tests to seed data the API cannot create yet.</summary>
+    public IServiceProvider Services => _factory.Services;
+
     public void Dispose() => _factory.Dispose();
 }

@@ -23,7 +23,8 @@ public class ClubsController(
     RemoveClubMemberUseCase? removeClubMemberUseCase = null,
     GetClubEventsUseCase? getClubEventsUseCase = null,
     CreateClubEventUseCase? createClubEventUseCase = null,
-    UpdateClubEventUseCase? updateClubEventUseCase = null) : ControllerBase
+    UpdateClubEventUseCase? updateClubEventUseCase = null,
+    GetClubTasksUseCase? getClubTasksUseCase = null) : ControllerBase
 {
     private readonly IJwtTokenService _jwtTokenService =
         jwtTokenService ?? new Infrastructure.Security.JwtTokenService(new ConfigurationBuilder().Build());
@@ -568,6 +569,98 @@ public class ClubsController(
             GetClubEventsStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
             GetClubEventsStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
             GetClubEventsStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
+        };
+    }
+
+    /// <summary>Response item for <c>GET /api/clubs/{id}/tasks</c> (INC-27).</summary>
+    public sealed record ClubTaskResponse(
+        Guid Id,
+        Guid ClubId,
+        string Title,
+        string? Description,
+        string Status,
+        Guid? AssigneeMemberId,
+        string? AssigneeDisplayName,
+        DateTimeOffset CreatedAtUtc);
+
+    private static string MapTaskStatus(ClubTaskStatus status) => status switch
+    {
+        ClubTaskStatus.InProgress => "in_progress",
+        ClubTaskStatus.Done => "done",
+        _ => "todo"
+    };
+
+    private static ClubTaskResponse MapToTaskResponse(ClubTask t)
+    {
+        // Fall back to the e-mail address when the assignee has no display name yet.
+        string? assigneeName = t.Assignee is null
+            ? null
+            : string.IsNullOrWhiteSpace(t.Assignee.DisplayName) ? t.Assignee.Email : t.Assignee.DisplayName;
+
+        return new ClubTaskResponse(
+            t.Id,
+            t.ClubId,
+            t.Title,
+            t.Description,
+            MapTaskStatus(t.Status),
+            t.AssigneeMemberId,
+            assigneeName,
+            t.CreatedAtUtc);
+    }
+
+    /// <summary>
+    /// Retrieves the Kanban board tasks of the specified club workspace (INC-27).
+    /// Enforces tenant isolation: only authenticated members of the club can view its tasks.
+    /// 200 → task list · 401 → unauthenticated · 403 → forbidden · 404 → club not found.
+    /// </summary>
+    [HttpGet("{id:guid}/tasks")]
+    [ProducesResponseType(typeof(IEnumerable<ClubTaskResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClubTasks(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var authHeader = Request?.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { error = "unauthorized", detail = "Authorization header is missing or malformed." });
+        }
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var validation = _jwtTokenService.ValidateToken(token);
+
+        if (validation.Status == JwtValidationStatus.Expired)
+        {
+            return Unauthorized(new { error = "token_expired", detail = "The session has expired. Please log in again." });
+        }
+
+        if (validation.Status != JwtValidationStatus.Valid || validation.MemberId is null)
+        {
+            return Unauthorized(new { error = "invalid_token", detail = "The provided token is invalid." });
+        }
+
+        if (getClubTasksUseCase is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "service_unavailable", detail = "Task retrieval service is unavailable." });
+        }
+
+        var query = new GetClubTasksQuery
+        {
+            ClubId = id,
+            RequestingMemberId = validation.MemberId.Value
+        };
+
+        var outcome = await getClubTasksUseCase.ExecuteAsync(query, cancellationToken).ConfigureAwait(false);
+
+        return outcome.Status switch
+        {
+            GetClubTasksStatus.Success => Ok(outcome.Tasks.Select(MapToTaskResponse)),
+            GetClubTasksStatus.NotFound => NotFound(new { error = "not_found", detail = outcome.Violation }),
+            GetClubTasksStatus.Forbidden => StatusCode(StatusCodes.Status403Forbidden, new { error = "forbidden", detail = outcome.Violation }),
+            GetClubTasksStatus.InvalidInput => BadRequest(new { error = "invalid_input", detail = outcome.Violation }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { error = "retrieval_failed", detail = outcome.Violation })
         };
     }

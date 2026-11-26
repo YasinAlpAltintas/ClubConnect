@@ -319,6 +319,28 @@
       "error": "Kon aanmelding niet bijwerken. Probeer het opnieuw."
     }
   },
+  "tasks": {
+    "title": "Takenbord",
+    "subtitle": "Al het werk van {{clubName}}, gegroepeerd per status.",
+    "backToDashboard": "Terug naar dashboard",
+    "openBoard": "Takenbord openen",
+    "boardLabel": "Kanban-takenbord",
+    "columns": {
+      "todo": "Te doen",
+      "in_progress": "Bezig",
+      "done": "Klaar"
+    },
+    "taskCount_one": "1 taak",
+    "taskCount_other": "{{count}} taken",
+    "unassigned": "Niet toegewezen",
+    "assignee": "Toegewezen aan",
+    "emptyColumn": "Geen taken",
+    "emptyBoardTitle": "Nog geen taken",
+    "emptyBoardDesc": "Deze club heeft nog geen taken op het bord.",
+    "loading": "Taken laden…",
+    "errorMessage": "Het takenbord kon niet geladen worden. Probeer het opnieuw.",
+    "retry": "Opnieuw proberen"
+  },
   "onboarding": {
     "title": "Welkom bij ClubConnect!",
     "subtitle": "Vul je voornaam en achternaam in om je profiel te voltooien.",
