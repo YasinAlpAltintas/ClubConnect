@@ -584,3 +584,20 @@ jobs:
           name: staging-evidence-${{ github.sha }}
           path: staging_evidence.json
           retention-days: 30
+
+  # ==========================================
+  # 8. NON-PROD - REGRESSION TESTS (step 9)
+  # ==========================================
+  regression-nonprod:
+    name: Regression on NON-PROD
+    needs:
+      - deploy-staging
+
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      (github.repository == 'yasinalpaltintas/ClubConnect' || github.repository == 'YasinAlpAltintas/ClubConnect')
+
+    uses: ./.github/workflows/regression.yml
+    with:
+      commit_sha: ${{ github.sha }}

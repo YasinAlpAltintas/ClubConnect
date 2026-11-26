@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// When PLAYWRIGHT_BASE_URL is set, the suite runs against an already deployed
+// environment (NON-PROD regression or PROD sanity), so no local servers are started.
+const remoteBaseUrl = process.env.PLAYWRIGHT_BASE_URL
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts/,
@@ -9,7 +13,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+    baseURL: remoteBaseUrl || 'http://localhost:5173',
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,7 +22,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: [
+  webServer: remoteBaseUrl ? undefined : [
     {
       command: 'dotnet run --project ../backend/ClubConnect.Api --configuration Release --no-launch-profile --urls "http://127.0.0.1:5069"',
       url: 'http://127.0.0.1:5069/health',

@@ -47,6 +47,7 @@ public static class DependencyInjection
             {
                 npgsql.MigrationsAssembly(typeof(ClubConnectDbContext).Assembly);
             });
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
         });
 
         services.AddScoped<IMemberRepository, MemberRepository>();

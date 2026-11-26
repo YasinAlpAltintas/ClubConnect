@@ -33,3 +33,7 @@ Thumbs.db
 
 ## Agent & AI Workspaces
 .agents/
+
+# graphify (lokaal gegenereerd)
+graphify-out/
+.claude/settings.local.json

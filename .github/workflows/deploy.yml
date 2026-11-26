@@ -11,6 +11,11 @@ name: ClubConnect Deploy
 #        * Required Reviewers: Senior DevOps / Tech Lead approval required.
 #        * Deployment Branches: Restricted to 'main'.
 #    - Requires explicit manual input: confirm_production == 'CONFIRM'.
+#    - Requires regression evidence (regression.yml, step 9) and approved
+#      acceptance evidence (acceptance.yml, step 10) for the same commit.
+#    - After deploying, runs a read-only Playwright sanity check against PROD
+#      (step 12). On failure it rolls back automatically with rollback.sh.
+#    - Requires repository variables NONPROD_URL and PROD_URL.
 # 3. Strict Credential Isolation:
 #    - Staging uses DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
 #    - Production uses PROD_DEPLOY_HOST, PROD_DEPLOY_USER, PROD_DEPLOY_SSH_KEY, PROD_DEPLOY_KNOWN_HOSTS.
@@ -419,6 +424,19 @@ jobs:
           retention-days: 30
 
   # ============================================================================
+  # 2b. NON-PROD REGRESSION TESTS (step 9)
+  # ============================================================================
+  regression-staging:
+    name: Regression on NON-PROD
+    needs:
+      - validate
+      - deploy-staging
+    if: inputs.environment == 'staging'
+    uses: ./.github/workflows/regression.yml
+    with:
+      commit_sha: ${{ needs.validate.outputs.commit_sha }}
+
+  # ============================================================================
   # 3. PRODUCTION DEPLOYMENT
   # Protected by GitHub Environment Reviewers & Staging Evidence Verification
   # ============================================================================
@@ -547,6 +565,52 @@ jobs:
           echo "STAGING_FRONTEND_DIGEST=${stg_frontend_digest}" >> "$GITHUB_ENV"
           echo "STAGING_BACKEND_DIGEST=${stg_backend_digest}" >> "$GITHUB_ENV"
 
+      - name: Verify Regression & Acceptance Evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          PROD_URL: ${{ vars.PROD_URL }}
+        run: |
+          set -euo pipefail
+
+          # Step 12 needs the public PROD URL for the sanity check; fail before deploying.
+          if [ -z "${PROD_URL:-}" ]; then
+            echo "::error::Repository variable PROD_URL is not set. It is required for the post-deploy sanity check." >&2
+            exit 1
+          fi
+
+          # Steps 9 and 10: regression tests passed on NON-PROD and the story was accepted.
+          mkdir -p promotion_evidence
+          for evidence in regression-evidence acceptance-evidence; do
+            name="${evidence}-${COMMIT_SHA}"
+            run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}" \
+              --jq '[.artifacts[] | select(.expired == false)][0].workflow_run.id // empty')
+            if [ -z "$run_id" ]; then
+              echo "::error::Missing '${name}'. Production requires passing NON-PROD regression tests (regression.yml) and an approved acceptance run (acceptance.yml) for this commit." >&2
+              exit 1
+            fi
+            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "promotion_evidence/${evidence}"
+          done
+
+          regression_commit=$(jq -r '.commit_sha // empty' promotion_evidence/regression-evidence/regression_evidence.json)
+          regression_result=$(jq -r '.regression_test // empty' promotion_evidence/regression-evidence/regression_evidence.json)
+          acceptance_commit=$(jq -r '.commit_sha // empty' promotion_evidence/acceptance-evidence/acceptance_evidence.json)
+          acceptance_result=$(jq -r '.acceptance // empty' promotion_evidence/acceptance-evidence/acceptance_evidence.json)
+
+          if [ "$regression_commit" != "$COMMIT_SHA" ] || [ "$regression_result" != "PASSED" ]; then
+            echo "::error::Regression evidence is invalid for commit $COMMIT_SHA (commit: $regression_commit, result: $regression_result)." >&2
+            exit 1
+          fi
+
+          if [ "$acceptance_commit" != "$COMMIT_SHA" ] || [ "$acceptance_result" != "ACCEPTED" ]; then
+            echo "::error::Acceptance evidence is invalid for commit $COMMIT_SHA (commit: $acceptance_commit, result: $acceptance_result)." >&2
+            exit 1
+          fi
+
+          echo "Regression and acceptance evidence verified for commit $COMMIT_SHA:"
+          jq -r '"  Accepted stories: \(.user_stories) (approved by \(.approved_by) at \(.accepted_at))"' \
+            promotion_evidence/acceptance-evidence/acceptance_evidence.json
+
       - name: Checkout deployment automation
         uses: actions/checkout@v4
         with:
@@ -619,3 +683,82 @@ jobs:
             --verified-frontend-digest="${VF}" \
             --verified-backend-digest="${VB}"
           EOF
+
+      # ------------------------------------------------------------------------
+      # Step 12: sanity check in PROD (read-only) with automatic rollback.
+      # Only reached when deploy.sh succeeded, so <env>_previous.release holds
+      # the last good version and rollback.sh restores exactly that release.
+      # ------------------------------------------------------------------------
+      - name: Setup Node.js for sanity check
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright for sanity check
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run PROD sanity check
+        id: sanity
+        continue-on-error: true
+        working-directory: frontend
+        env:
+          CI: 'true'
+          PLAYWRIGHT_BASE_URL: ${{ vars.PROD_URL }}
+        run: npx playwright test --grep @sanity --reporter=list,html
+
+      - name: Upload sanity report
+        if: always() && steps.sanity.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-sanity-report-${{ needs.validate.outputs.commit_sha }}
+          path: frontend/playwright-report/
+          retention-days: 30
+
+      - name: Roll back PROD after failed sanity check
+        if: steps.sanity.outcome == 'failure'
+        env:
+          DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          echo "::error::PROD sanity check FAILED for ${COMMIT_SHA}. Rolling back to the previous release..."
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "COMMIT_SHA='$COMMIT_SHA' bash -se" <<'EOF'
+          set -euo pipefail
+          "/opt/clubconnect/releases/${COMMIT_SHA}/scripts/rollback.sh" production --confirm
+          EOF
+          echo "::error::PROD was rolled back. Database migrations are NOT reversed. Log the defect (Blocking: fix now / Minor: later sprint) and return to development."
+          exit 1
+
+      - name: Record PROD sanity evidence
+        env:
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          PROD_URL: ${{ vars.PROD_URL }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg target_url "$PROD_URL" \
+            --arg checked_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            '{commit_sha: $commit_sha, environment: "production", target_url: $target_url, checked_at: $checked_at, sanity_check: "PASSED"}' \
+            > production_sanity_evidence.json
+          cat production_sanity_evidence.json
+
+      - name: Upload PROD sanity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-sanity-evidence-${{ needs.validate.outputs.commit_sha }}
+          path: production_sanity_evidence.json
+          retention-days: 90
