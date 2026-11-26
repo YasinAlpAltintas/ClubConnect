@@ -319,6 +319,28 @@
       "error": "Failed to update RSVP. Please try again."
     }
   },
+  "tasks": {
+    "title": "Task Board",
+    "subtitle": "All work for {{clubName}}, grouped by status.",
+    "backToDashboard": "Back to Dashboard",
+    "openBoard": "Open Task Board",
+    "boardLabel": "Kanban task board",
+    "columns": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "done": "Done"
+    },
+    "taskCount_one": "1 task",
+    "taskCount_other": "{{count}} tasks",
+    "unassigned": "Unassigned",
+    "assignee": "Assignee",
+    "emptyColumn": "No tasks here",
+    "emptyBoardTitle": "No tasks yet",
+    "emptyBoardDesc": "This club has no tasks on its board yet.",
+    "loading": "Loading tasks…",
+    "errorMessage": "Failed to load the task board. Please try again.",
+    "retry": "Retry"
+  },
   "onboarding": {
     "title": "Welcome to ClubConnect!",
     "subtitle": "Enter your first and last name to complete your profile.",

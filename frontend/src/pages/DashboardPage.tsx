@@ -2,14 +2,21 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { type AuthenticatedMember } from './LobbyPage'
-import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole, removeClubMember, getClubEvents } from '../lib/api'
+import { type ClubDto, getMemberClubs, getClubDetails, getClubMembers, updateMemberRole, removeClubMember, getClubEvents, getClubTasks } from '../lib/api'
 import { useActiveClub } from '../lib/useActiveClub'
 import ClubSwitcherDropdown from '../components/ClubSwitcherDropdown'
 import ClubMembersTable from '../components/ClubMembersTable'
 import ClubCalendarGrid from '../components/ClubCalendarGrid'
+import KanbanBoard from '../components/KanbanBoard'
 import InviteCodeCard from '../components/InviteCodeCard'
 import ThemeToggle from '../components/ThemeToggle'
 import LanguageToggle from '../components/LanguageToggle'
+
+type DashboardSubView = 'overview' | 'members' | 'calendar' | 'tasks'
+
+function buildDashboardHash(clubId: string, view: DashboardSubView): string {
+  return view === 'overview' ? `#dashboard/${clubId}` : `#dashboard/${clubId}/${view}`
+}
 
 export interface DashboardPageProps {
   member: AuthenticatedMember
@@ -31,7 +38,7 @@ export default function DashboardPage({
   const { t } = useTranslation()
   const [selectedClubId, setSelectedClubId] = useState<string | null | undefined>(initialActiveClubId)
 
-  const getSubViewFromHash = (): 'overview' | 'members' | 'calendar' => {
+  const getSubViewFromHash = (): DashboardSubView => {
     if (typeof window !== 'undefined') {
       if (window.location.hash.includes('/members')) {
         return 'members'
@@ -39,11 +46,14 @@ export default function DashboardPage({
       if (window.location.hash.includes('/calendar')) {
         return 'calendar'
       }
+      if (window.location.hash.includes('/tasks')) {
+        return 'tasks'
+      }
     }
     return 'overview'
   }
 
-  const [subView, setSubView] = useState<'overview' | 'members' | 'calendar'>(getSubViewFromHash)
+  const [subView, setSubView] = useState<DashboardSubView>(getSubViewFromHash)
   const [promotingMemberId, setPromotingMemberId] = useState<string | null>(null)
   const [promoteNotification, setPromoteNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
@@ -153,15 +163,33 @@ export default function DashboardPage({
     }
   }, [eventsError, onSessionExpired])
 
-  const navigateToSubView = (nextView: 'overview' | 'members' | 'calendar') => {
+  const {
+    data: clubTasks = [],
+    isLoading: isLoadingTasks,
+    isError: isTasksError,
+    error: tasksError,
+    refetch: refetchTasks,
+  } = useQuery({
+    queryKey: ['clubTasks', targetClubId, member.token],
+    queryFn: () => getClubTasks(targetClubId!, member.token),
+    enabled: !!targetClubId && !!member.token && subView === 'tasks',
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (tasksError) {
+      const status = (tasksError as { status?: number }).status
+      const msg = tasksError instanceof Error ? tasksError.message : ''
+      if (status === 401 || msg.includes('401')) {
+        onSessionExpired?.()
+      }
+    }
+  }, [tasksError, onSessionExpired])
+
+  const navigateToSubView = (nextView: DashboardSubView) => {
     setSubView(nextView)
     if (typeof window !== 'undefined' && targetClubId) {
-      window.location.hash =
-        nextView === 'members'
-          ? `#dashboard/${targetClubId}/members`
-          : nextView === 'calendar'
-          ? `#dashboard/${targetClubId}/calendar`
-          : `#dashboard/${targetClubId}`
+      window.location.hash = buildDashboardHash(targetClubId, nextView)
     }
   }
 
@@ -169,23 +197,13 @@ export default function DashboardPage({
     setSelectedClubId(clubId)
     setActiveClubId(clubId)
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
-      window.location.hash =
-        subView === 'members'
-          ? `#dashboard/${clubId}/members`
-          : subView === 'calendar'
-          ? `#dashboard/${clubId}/calendar`
-          : `#dashboard/${clubId}`
+      window.location.hash = buildDashboardHash(clubId, subView)
     }
   }
 
   useEffect(() => {
     if (targetClubId && typeof window !== 'undefined' && window.location.hash.startsWith('#dashboard')) {
-      const expectedHash =
-        subView === 'members'
-          ? `#dashboard/${targetClubId}/members`
-          : subView === 'calendar'
-          ? `#dashboard/${targetClubId}/calendar`
-          : `#dashboard/${targetClubId}`
+      const expectedHash = buildDashboardHash(targetClubId, subView)
       if (window.location.hash !== expectedHash) {
         window.location.hash = expectedHash
       }
@@ -413,6 +431,15 @@ export default function DashboardPage({
             >
               {t('calendar.backToDashboard')}
             </button>
+          ) : subView === 'tasks' ? (
+            <button
+              type="button"
+              data-testid="tasks-back-to-dashboard-btn"
+              onClick={() => navigateToSubView('overview')}
+              className="btn-tactile rounded-xl px-3 py-1.5 text-xs font-medium text-aurora-primary ring-1 ring-aurora-primary/30 hover:bg-aurora-primary/10 cursor-pointer transition-colors"
+            >
+              {t('tasks.backToDashboard')}
+            </button>
           ) : (
             <>
               {isClubAdmin && (
@@ -618,6 +645,37 @@ export default function DashboardPage({
             onEventUpdated={() => void refetchEvents()}
           />
         </div>
+      ) : subView === 'tasks' ? (
+        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6" data-testid="tasks-page">
+          <div className="mb-6">
+            <button
+              type="button"
+              data-testid="tasks-back-to-dashboard-link"
+              onClick={() => navigateToSubView('overview')}
+              className="inline-flex items-center text-xs font-semibold text-aurora-primary hover:text-aurora-muted cursor-pointer transition-colors"
+            >
+              ← {t('tasks.backToDashboard')}
+            </button>
+            <h1
+              data-testid="tasks-page-heading"
+              className="mt-2 text-2xl font-bold tracking-tight text-aurora-text sm:text-3xl"
+            >
+              {t('tasks.title')}
+            </h1>
+            {currentClub && (
+              <p data-testid="tasks-page-subtitle" className="mt-1 text-xs text-aurora-text-secondary">
+                {t('tasks.subtitle', { clubName: currentClub.name })}
+              </p>
+            )}
+          </div>
+
+          <KanbanBoard
+            tasks={clubTasks}
+            isLoading={isLoadingTasks}
+            isError={isTasksError}
+            onRetry={() => void refetchTasks()}
+          />
+        </div>
       ) : (
         <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
           {currentClub && (
@@ -741,9 +799,6 @@ export default function DashboardPage({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.5-15h15a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 013 17.25V6.75A2.25 2.25 0 015.25 4.5z" />
                       </svg>
                     </div>
-                    <span className="rounded-full bg-aurora-elevated px-2 py-0.5 text-[10px] font-semibold text-aurora-text-muted ring-1 ring-aurora-border">
-                      {t('dashboard.modules.comingSoon')}
-                    </span>
                   </div>
                   <h3 className="mt-4 font-semibold text-aurora-text">
                     {t('dashboard.modules.tasksTitle')}
@@ -751,6 +806,17 @@ export default function DashboardPage({
                   <p className="mt-1 text-xs text-aurora-text-secondary leading-relaxed">
                     {t('dashboard.modules.tasksDesc')}
                   </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-aurora-border/60">
+                  <button
+                    type="button"
+                    data-testid="dashboard-tasks-btn"
+                    onClick={() => navigateToSubView('tasks')}
+                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-secondary hover:text-white cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span>{t('tasks.openBoard')}</span>
+                    <span aria-hidden="true">→</span>
+                  </button>
                 </div>
               </article>
 
