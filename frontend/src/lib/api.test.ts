@@ -16,6 +16,7 @@ import {
   joinClub,
   JoinClubApiException,
   getClubMembers,
+  getClubTasks,
   updateMemberRole,
   removeClubMember,
 } from './api'
@@ -680,6 +681,47 @@ describe('joinClub', () => {
     await expect(joinClub({ code: '123456' }, 'token', fetchFn)).rejects.toMatchObject({
       apiError: { code: 'unexpected', status: 500 },
     })
+  })
+})
+
+describe('getClubTasks', () => {
+  it('returns tasks array on 200 and sends the bearer token', async () => {
+    const mockTasks = [
+      {
+        id: 't1',
+        clubId: 'club-1',
+        title: 'Book the hall',
+        description: null,
+        status: 'todo',
+        assigneeMemberId: null,
+        assigneeDisplayName: null,
+        createdAtUtc: '2026-11-01T00:00:00Z',
+      },
+    ]
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      expect(url).toBe('/api/clubs/club-1/tasks')
+      expect(init?.method).toBe('GET')
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-token' })
+      return jsonResponse(mockTasks, 200)
+    }) as typeof fetch
+
+    const result = await getClubTasks('club-1', 'test-token', fetchFn)
+    expect(result).toEqual(mockTasks)
+  })
+
+  it('throws Error with status 403 when the member has no access to the club', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'forbidden' }, 403)) as typeof fetch
+
+    await expect(getClubTasks('club-1', 'test-token', fetchFn)).rejects.toMatchObject({
+      message: 'Failed to fetch club tasks (403)',
+      status: 403,
+    })
+  })
+
+  it('throws Error with status 401 when unauthenticated', async () => {
+    const fetchFn = (async () => jsonResponse({ error: 'unauthorized' }, 401)) as typeof fetch
+
+    await expect(getClubTasks('club-1', undefined, fetchFn)).rejects.toMatchObject({ status: 401 })
   })
 })
 
