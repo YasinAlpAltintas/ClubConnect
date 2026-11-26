@@ -1,0 +1,129 @@
+name: ClubConnect Regression (NON-PROD)
+
+# ==============================================================================
+# Step 9 of the testing process: "Run regression tests".
+# Runs the full Playwright E2E suite against the deployed NON-PROD environment
+# and records regression evidence for the commit. Production promotion
+# (deploy.yml) is blocked until this evidence exists.
+#
+# Requires the repository variable NONPROD_URL (e.g. https://npr.example.com).
+# The suite creates its own uniquely named test accounts and clubs on NON-PROD.
+# ==============================================================================
+
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA that is deployed on NON-PROD'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA that is deployed on NON-PROD (full 40-character SHA)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clubconnect-regression-nonprod
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    name: Regression Tests (NON-PROD)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate inputs
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          NONPROD_URL: ${{ vars.NONPROD_URL }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid commit SHA '${COMMIT_SHA}'. Must be a 40-character lowercase hexadecimal hash." >&2
+            exit 1
+          fi
+          if [ -z "${NONPROD_URL:-}" ]; then
+            echo "::error::Repository variable NONPROD_URL is not set. Add it under Settings > Secrets and variables > Actions > Variables." >&2
+            exit 1
+          fi
+
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers & dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for NON-PROD to be reachable
+        env:
+          NONPROD_URL: ${{ vars.NONPROD_URL }}
+        run: |
+          set -euo pipefail
+          echo "Checking that ${NONPROD_URL} is reachable..."
+          for i in $(seq 1 30); do
+            if curl -s -f -o /dev/null "${NONPROD_URL}"; then
+              echo "NON-PROD is reachable."
+              exit 0
+            fi
+            echo "Attempt $i/30: NON-PROD not reachable yet, sleeping 2s..."
+            sleep 2
+          done
+          echo "::error::NON-PROD at ${NONPROD_URL} is not reachable." >&2
+          exit 1
+
+      - name: Run full E2E regression suite against NON-PROD
+        working-directory: frontend
+        env:
+          CI: 'true'
+          PLAYWRIGHT_BASE_URL: ${{ vars.NONPROD_URL }}
+        run: npx playwright test --reporter=list,html
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-report-${{ inputs.commit_sha }}
+          path: frontend/playwright-report/
+          retention-days: 14
+
+      - name: Record regression evidence
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          NONPROD_URL: ${{ vars.NONPROD_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg environment "staging" \
+            --arg target_url "$NONPROD_URL" \
+            --arg tested_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg run_url "$RUN_URL" \
+            '{commit_sha: $commit_sha, environment: $environment, target_url: $target_url, tested_at: $tested_at, run_url: $run_url, regression_test: "PASSED"}' \
+            > regression_evidence.json
+          cat regression_evidence.json
+
+      - name: Upload regression evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-evidence-${{ inputs.commit_sha }}
+          path: regression_evidence.json
+          retention-days: 30

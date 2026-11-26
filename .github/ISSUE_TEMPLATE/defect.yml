@@ -1,0 +1,69 @@
+name: Defect
+description: Log a defect found during testing (smoke, test cases, regression, acceptance or PROD sanity check).
+title: "[Defect] "
+labels: ["defect"]
+body:
+  - type: input
+    id: story
+    attributes:
+      label: User story
+      description: The Linear user story this defect belongs to.
+      placeholder: INC-XX
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: "Blocking: fix now, before the story can continue. Minor: plan it for a later sprint."
+      options:
+        - Blocking (fix now)
+        - Minor (later sprint)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: found_in
+    attributes:
+      label: Found in step
+      options:
+        - 7. Smoke tests (NON-PROD)
+        - 8. Test cases (NON-PROD)
+        - 9. Regression tests (NON-PROD)
+        - 10. Acceptance testing (NON-PROD)
+        - 12. Sanity check (PROD, rolled back)
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA / workflow run
+      description: The tested commit or a link to the failing workflow run.
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Add screenshots or the Playwright report if available.
+    validations:
+      required: true
