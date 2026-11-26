@@ -1,0 +1,120 @@
+name: ClubConnect Acceptance
+
+# ==============================================================================
+# Step 10 of the testing process: "Perform acceptance testing".
+# After the test cases (step 8) and regression tests (step 9) have passed on
+# NON-PROD, the reviewer verifies the user story against its acceptance
+# criteria and approves it here.
+#
+# - The 'acceptance' GitHub Environment must have Required reviewers configured
+#   (Settings > Environments > acceptance). The run waits for their approval.
+# - Approval produces acceptance evidence for the commit. deploy.yml refuses
+#   to deploy to production without it.
+# - Rejected? Do not approve: log the defect (Blocking: fix now / Minor: later
+#   sprint) and start again from development (step 4).
+# ==============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA that was tested on NON-PROD (full 40-character SHA)'
+        required: true
+        type: string
+      user_stories:
+        description: 'Linear user stories accepted in this release (e.g. INC-50, INC-51)'
+        required: true
+        type: string
+      notes:
+        description: 'Acceptance notes (optional)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # ============================================================================
+  # 1. VERIFY THE COMMIT PASSED SMOKE AND REGRESSION TESTS ON NON-PROD
+  # ============================================================================
+  verify-nonprod:
+    name: Verify NON-PROD Test Evidence
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate commit SHA
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid commit SHA '${COMMIT_SHA}'. Must be a 40-character lowercase hexadecimal hash." >&2
+            exit 1
+          fi
+
+      - name: Verify smoke and regression evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          for evidence in staging-evidence regression-evidence; do
+            name="${evidence}-${COMMIT_SHA}"
+            count=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}" \
+              --jq '[.artifacts[] | select(.expired == false)] | length')
+            if [ "$count" -eq 0 ]; then
+              echo "::error::Missing '${name}'. The commit must be deployed to NON-PROD and pass smoke + regression tests before acceptance." >&2
+              exit 1
+            fi
+            echo "Found ${name}."
+          done
+
+  # ============================================================================
+  # 2. ACCEPTANCE APPROVAL (waits for the required reviewer)
+  # ============================================================================
+  accept:
+    name: Acceptance Approval
+    runs-on: ubuntu-latest
+    needs: verify-nonprod
+    environment: acceptance
+
+    steps:
+      - name: Record acceptance evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          USER_STORIES: ${{ inputs.user_stories }}
+          NOTES: ${{ inputs.notes }}
+          REQUESTED_BY: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # The environment reviewer who approved this run (falls back to the requester
+          # when the environment has no required reviewers configured).
+          approved_by=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "approved") | .user.login] | join(", ")' || true)
+          if [ -z "$approved_by" ]; then
+            echo "::warning::No environment approval found. Configure Required reviewers on the 'acceptance' environment."
+            approved_by="$REQUESTED_BY (no reviewer configured)"
+          fi
+          jq -n \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg user_stories "$USER_STORIES" \
+            --arg notes "$NOTES" \
+            --arg requested_by "$REQUESTED_BY" \
+            --arg approved_by "$approved_by" \
+            --arg accepted_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg run_url "$RUN_URL" \
+            '{commit_sha: $commit_sha, user_stories: $user_stories, notes: $notes, requested_by: $requested_by, approved_by: $approved_by, accepted_at: $accepted_at, run_url: $run_url, acceptance: "ACCEPTED"}' \
+            > acceptance_evidence.json
+          cat acceptance_evidence.json
+
+      - name: Upload acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-evidence-${{ inputs.commit_sha }}
+          path: acceptance_evidence.json
+          retention-days: 90
