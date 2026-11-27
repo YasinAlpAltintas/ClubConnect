@@ -13,8 +13,8 @@ Every user story goes through the 14 steps below. The table shows where each ste
 | 7 | Run smoke tests | `scripts/smoke-test.sh` during the deploy | Staging evidence artifact |
 | 8 | Execute the test cases, log results | Manual on NON-PROD; results in the PR / Linear | — |
 | 9 | Run regression tests | Full Playwright suite against NON-PROD (`regression.yml`, runs automatically after every NON-PROD deploy) | `regression-evidence-<sha>` artifact |
-| 10 | Perform acceptance testing (reject → log defect) | Run `acceptance.yml`; the reviewer approves the `acceptance` environment | `acceptance-evidence-<sha>` artifact |
-| 11 | Deploy to PROD | **Automatic** after merging `develop` into `main` once the CI run on `main` is green (`deploy.yml`, INC-61). It promotes the tested `develop` commit, not a new build. Manual runs of `deploy.yml` (production) remain possible. | `deploy-production` job — blocked without smoke, regression and acceptance evidence |
+| 10 | Perform acceptance testing (reject → log defect) | Review the story on NON-PROD against its acceptance criteria. Approve by merging `develop` into `main`. | Pull request `develop` → `main` |
+| 11 | Deploy to PROD | **Automatic** once the CI run on `main` is green (`deploy.yml`, INC-61). It promotes the tested `develop` commit, not a new build. Manual runs of `deploy.yml` (production) remain possible. | `deploy-production` job — blocked without smoke and regression evidence |
 | 12 | Run a sanity check (fail → roll back PROD) | Read-only Playwright `@sanity` checks against PROD, automatic rollback with `scripts/rollback.sh` | `production-sanity-evidence-<sha>` artifact |
 | 13 | Verify the Definition of Done | Checklist in the pull request template | — |
 | 14 | Close the user story | Linear → **Released to prod** | — |
@@ -22,11 +22,10 @@ Every user story goes through the 14 steps below. The table shows where each ste
 ## Release order
 
 1. Merge the story into `develop` → NON-PROD deploy, smoke and regression tests run automatically.
-2. Execute the test cases on NON-PROD (step 8).
-3. Run `acceptance.yml` for that `develop` commit and approve it (step 10).
-4. Merge `develop` into `main` → when CI on `main` is green, PROD deploys automatically and the sanity check runs.
+2. Execute the test cases and review the story on NON-PROD (steps 8 and 10).
+3. Merge `develop` into `main` → when CI on `main` is green, PROD deploys automatically and the sanity check runs.
 
-If step 3 was skipped, the automatic PROD deploy fails at the evidence check and PROD keeps the previous version. Approve acceptance and redeploy with `deploy.yml` (production) for that commit.
+If the NON-PROD smoke or regression tests did not pass for that commit, the automatic PROD deploy stops at the evidence check and PROD keeps the previous version.
 
 ## Defects
 
@@ -40,7 +39,6 @@ A failure in steps 7–10 or 12 is logged with the **Defect** issue template:
 1. **Repository variables** (Settings → Secrets and variables → Actions → Variables):
    - `NONPROD_URL` — public URL of NON-PROD, used by the regression tests.
    - `PROD_URL` — public URL of PROD, used by the sanity check.
-2. **Environment `acceptance`** (Settings → Environments): add the product owner / tester as **Required reviewer**.
 
 ## Notes
 

@@ -29,9 +29,9 @@ Linear: INC-XX: <!-- paste the user story title -->
 - [ ] Deployed to NON-PROD and smoke tests passed
 - [ ] Test cases executed and results logged
 - [ ] Regression tests passed on NON-PROD (`regression.yml`)
-- [ ] Acceptance approved (`acceptance.yml`)
+- [ ] Story reviewed on NON-PROD against its acceptance criteria
 
 **Release (steps 11–14)**
-- [ ] Deployed to PROD (`deploy.yml`)
+- [ ] Merged into `main` and deployed to PROD automatically
 - [ ] PROD sanity check passed
 - [ ] Linear story moved to **Released to prod**

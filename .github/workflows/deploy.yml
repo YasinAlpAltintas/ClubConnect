@@ -11,12 +11,10 @@ name: ClubConnect Deploy
 # 2. Production Promotion Gate:
 #    - Requires prior successful deployment & smoke test on staging.
 #    - Downloads verified staging evidence artifact containing exact immutable image digests.
-#    - Gated by GitHub Environment ('production') protection rules:
-#        * Required Reviewers: Senior DevOps / Tech Lead approval required.
-#        * Deployment Branches: Restricted to 'main'.
-#    - Requires explicit manual input: confirm_production == 'CONFIRM'.
-#    - Requires regression evidence (regression.yml, step 9) and approved
-#      acceptance evidence (acceptance.yml, step 10) for the same commit.
+#    - Runs in the GitHub Environment 'production' (holds the PROD secrets).
+#    - Manual runs require explicit input: confirm_production == 'CONFIRM'.
+#    - Requires regression evidence (regression.yml, step 9) for the same commit.
+#      Acceptance (step 10) is the review on NON-PROD before merging into main.
 #    - After deploying, runs a read-only Playwright sanity check against PROD
 #      (step 12). On failure it rolls back automatically with rollback.sh.
 #    - Requires repository variables NONPROD_URL and PROD_URL.
@@ -605,7 +603,7 @@ jobs:
           echo "STAGING_FRONTEND_DIGEST=${stg_frontend_digest}" >> "$GITHUB_ENV"
           echo "STAGING_BACKEND_DIGEST=${stg_backend_digest}" >> "$GITHUB_ENV"
 
-      - name: Verify Regression & Acceptance Evidence
+      - name: Verify Regression Evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
@@ -619,37 +617,26 @@ jobs:
             exit 1
           fi
 
-          # Steps 9 and 10: regression tests passed on NON-PROD and the story was accepted.
-          mkdir -p promotion_evidence
-          for evidence in regression-evidence acceptance-evidence; do
-            name="${evidence}-${COMMIT_SHA}"
-            run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}" \
-              --jq '[.artifacts[] | select(.expired == false)][0].workflow_run.id // empty')
-            if [ -z "$run_id" ]; then
-              echo "::error::Missing '${name}'. Production requires passing NON-PROD regression tests (regression.yml) and an approved acceptance run (acceptance.yml) for this commit." >&2
-              exit 1
-            fi
-            gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "promotion_evidence/${evidence}"
-          done
+          # Step 9: the full regression suite passed on NON-PROD for this exact commit.
+          # (Step 10, acceptance, is the review before merging develop into main.)
+          name="regression-evidence-${COMMIT_SHA}"
+          run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}" \
+            --jq '[.artifacts[] | select(.expired == false)][0].workflow_run.id // empty')
+          if [ -z "$run_id" ]; then
+            echo "::error::Missing '${name}'. Production requires passing NON-PROD regression tests (regression.yml) for this commit." >&2
+            exit 1
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name "$name" --dir promotion_evidence
 
-          regression_commit=$(jq -r '.commit_sha // empty' promotion_evidence/regression-evidence/regression_evidence.json)
-          regression_result=$(jq -r '.regression_test // empty' promotion_evidence/regression-evidence/regression_evidence.json)
-          acceptance_commit=$(jq -r '.commit_sha // empty' promotion_evidence/acceptance-evidence/acceptance_evidence.json)
-          acceptance_result=$(jq -r '.acceptance // empty' promotion_evidence/acceptance-evidence/acceptance_evidence.json)
+          regression_commit=$(jq -r '.commit_sha // empty' promotion_evidence/regression_evidence.json)
+          regression_result=$(jq -r '.regression_test // empty' promotion_evidence/regression_evidence.json)
 
           if [ "$regression_commit" != "$COMMIT_SHA" ] || [ "$regression_result" != "PASSED" ]; then
             echo "::error::Regression evidence is invalid for commit $COMMIT_SHA (commit: $regression_commit, result: $regression_result)." >&2
             exit 1
           fi
 
-          if [ "$acceptance_commit" != "$COMMIT_SHA" ] || [ "$acceptance_result" != "ACCEPTED" ]; then
-            echo "::error::Acceptance evidence is invalid for commit $COMMIT_SHA (commit: $acceptance_commit, result: $acceptance_result)." >&2
-            exit 1
-          fi
-
-          echo "Regression and acceptance evidence verified for commit $COMMIT_SHA:"
-          jq -r '"  Accepted stories: \(.user_stories) (approved by \(.approved_by) at \(.accepted_at))"' \
-            promotion_evidence/acceptance-evidence/acceptance_evidence.json
+          echo "Regression evidence verified for commit $COMMIT_SHA."
 
       - name: Checkout deployment automation
         uses: actions/checkout@v4
