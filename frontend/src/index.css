@@ -14,6 +14,24 @@
   --color-aurora-text-secondary: var(--text-secondary, #A1AABD);
   --color-aurora-text-muted: var(--text-muted, #737F94);
 
+  /* Status colours (INC-50). Shade suffixes: soft (lightest) → bright → base → strong (darkest). */
+  --color-aurora-danger-soft: var(--danger-soft);
+  --color-aurora-danger-bright: var(--danger-bright);
+  --color-aurora-danger: var(--danger-color);
+  --color-aurora-danger-strong: var(--danger-strong);
+  --color-aurora-success-soft: var(--success-soft);
+  --color-aurora-success-bright: var(--success-bright);
+  --color-aurora-success: var(--success-color);
+  --color-aurora-warning-soft: var(--warning-soft);
+  --color-aurora-warning-bright: var(--warning-bright);
+  --color-aurora-warning: var(--warning-color);
+  --color-aurora-warning-strong: var(--warning-strong);
+
+  /* Text/icons placed on a solid accent or status background (buttons, spinners). */
+  --color-aurora-on-accent: var(--on-accent);
+  /* Dimmed backdrop behind modals; use with an opacity modifier (e.g. /60). */
+  --color-aurora-scrim: var(--scrim-color);
+
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -29,6 +47,19 @@
   --text-primary: #F1F3F9;
   --text-secondary: #A1AABD;
   --text-muted: #737F94;
+  --danger-soft: oklch(80.8% 0.114 19.571);
+  --danger-bright: oklch(70.4% 0.191 22.216);
+  --danger-color: oklch(63.7% 0.237 25.331);
+  --danger-strong: oklch(57.7% 0.245 27.325);
+  --success-soft: oklch(84.5% 0.143 164.978);
+  --success-bright: oklch(76.5% 0.177 163.223);
+  --success-color: oklch(69.6% 0.17 162.48);
+  --warning-soft: oklch(87.9% 0.169 91.605);
+  --warning-bright: oklch(82.8% 0.189 84.429);
+  --warning-color: oklch(76.9% 0.188 70.08);
+  --warning-strong: oklch(66.6% 0.179 58.318);
+  --on-accent: #FFFFFF;
+  --scrim-color: #000000;
   color-scheme: dark;
 }
 
@@ -48,6 +79,21 @@ body.theme-light,
   --text-primary: #0F172A;
   --text-secondary: #475569;
   --text-muted: #94A3B8;
+  /* Same values as dark for now, so the light theme looks unchanged (INC-50).
+     INC-51 can tune these per theme for better contrast. */
+  --danger-soft: oklch(80.8% 0.114 19.571);
+  --danger-bright: oklch(70.4% 0.191 22.216);
+  --danger-color: oklch(63.7% 0.237 25.331);
+  --danger-strong: oklch(57.7% 0.245 27.325);
+  --success-soft: oklch(84.5% 0.143 164.978);
+  --success-bright: oklch(76.5% 0.177 163.223);
+  --success-color: oklch(69.6% 0.17 162.48);
+  --warning-soft: oklch(87.9% 0.169 91.605);
+  --warning-bright: oklch(82.8% 0.189 84.429);
+  --warning-color: oklch(76.9% 0.188 70.08);
+  --warning-strong: oklch(66.6% 0.179 58.318);
+  --on-accent: #FFFFFF;
+  --scrim-color: #000000;
   color-scheme: light;
 }
 
