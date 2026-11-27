@@ -226,7 +226,7 @@ describe('RegisterPage', () => {
       expect(screen.getByText('Enter a valid e-mail address.')).toBeInTheDocument()
     })
     expect(emailInput).toHaveAttribute('aria-invalid', 'true')
-    expect(emailInput.className).toContain('border-red-500')
+    expect(emailInput.className).toContain('border-aurora-danger')
   })
 
   it('shows validation error immediately when tabbing out of a short password', async () => {
@@ -243,7 +243,7 @@ describe('RegisterPage', () => {
       ).toBeInTheDocument()
     })
     expect(passwordInput).toHaveAttribute('aria-invalid', 'true')
-    expect(passwordInput.className).toContain('border-red-500')
+    expect(passwordInput.className).toContain('border-aurora-danger')
   })
 
   it('shows duplicate email conflict error and Log in button on blur when email is already taken', async () => {
@@ -259,7 +259,7 @@ describe('RegisterPage', () => {
       expect(screen.getByText('An account with this e-mail already exists.')).toBeInTheDocument()
     })
     expect(emailInput).toHaveAttribute('aria-invalid', 'true')
-    expect(emailInput.className).toContain('border-red-500')
+    expect(emailInput.className).toContain('border-aurora-danger')
     expect(screen.getAllByRole('button', { name: 'Log in' })[0]).toBeInTheDocument()
   })
 })

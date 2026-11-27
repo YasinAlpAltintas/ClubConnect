@@ -65,7 +65,7 @@ export default function ClubSwitcherDropdown({
         className="flex items-center space-x-2 rounded-xl bg-aurora-surface/80 px-3 py-1.5 text-xs ring-1 ring-aurora-border shadow-xs backdrop-blur-xs"
       >
         <div data-testid="club-switcher-single" className="flex items-center space-x-2">
-          <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+          <span className="h-2 w-2 rounded-full bg-aurora-success-bright" aria-hidden="true" />
           <span className="font-semibold text-aurora-text truncate max-w-[180px]">
             {activeClub.name}
           </span>
@@ -132,14 +132,14 @@ export default function ClubSwitcherDropdown({
         className="btn-tactile inline-flex items-center justify-between gap-2 rounded-xl bg-aurora-surface px-3 py-1.5 text-xs font-semibold text-aurora-text shadow-xs ring-1 ring-aurora-border hover:bg-aurora-elevated hover:ring-aurora-primary/40 focus:outline-none focus:ring-2 focus:ring-aurora-primary/30 cursor-pointer max-w-[260px]"
       >
         <span className="flex items-center space-x-2 truncate">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-aurora-success-bright" aria-hidden="true" />
           <span className="truncate font-medium">{activeClub?.name ?? t('clubSwitcher.selectClub')}</span>
         </span>
         {activeClub?.role && (
           <span
             className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
               activeClub.role === 'Club Admin'
-                ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20'
+                ? 'bg-aurora-warning/10 text-aurora-warning-soft ring-aurora-warning/20'
                 : 'bg-aurora-primary/10 text-aurora-muted ring-aurora-primary/20'
             }`}
           >
