@@ -37,3 +37,8 @@ Thumbs.db
 # graphify (lokaal gegenereerd)
 graphify-out/
 .claude/settings.local.json
+
+# Generated test coverage reports
+frontend/coverage/
+backend/**/TestResults/
+backend/**/coverage.cobertura.xml
