@@ -4,6 +4,10 @@ name: ClubConnect Deploy
 # Security & Operational Architecture
 # ==============================================================================
 # 1. Manual Staging Deployment: Triggered via workflow_dispatch.
+# 1b. Automatic Production Deployment (INC-61): when develop is merged into main
+#     and the "ClubConnect CI" run on main succeeds, this workflow promotes the
+#     tested develop commit (the second parent of the merge commit) to production.
+#     All production gates below still apply; the merge replaces confirm_production.
 # 2. Production Promotion Gate:
 #    - Requires prior successful deployment & smoke test on staging.
 #    - Downloads verified staging evidence artifact containing exact immutable image digests.
@@ -23,6 +27,11 @@ name: ClubConnect Deploy
 # ==============================================================================
 
 on:
+  # Automatic production release after a green CI run on main (INC-61).
+  workflow_run:
+    workflows: ['ClubConnect CI']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -50,7 +59,7 @@ on:
         default: false
 
 concurrency:
-  group: ${{ inputs.environment == 'production' && 'clubconnect-production' || 'clubconnect-staging' }}
+  group: ${{ (github.event_name == 'workflow_run' || inputs.environment == 'production') && 'clubconnect-production' || 'clubconnect-staging' }}
   cancel-in-progress: false
 
 permissions:
@@ -67,7 +76,17 @@ jobs:
     name: Validate Release & Security Gates
     runs-on: ubuntu-latest
 
+    # Manual runs always; automatic runs only for a successful CI push run on main
+    # in the main repository (never for forks or failed CI).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+
     outputs:
+      environment: ${{ steps.validate.outputs.environment }}
       commit_sha: ${{ steps.validate.outputs.commit_sha }}
       image_tag: ${{ steps.validate.outputs.image_tag }}
       frontend_image: ${{ steps.validate.outputs.frontend_image }}
@@ -84,16 +103,34 @@ jobs:
       - name: Validate Commit SHA & Lineage
         id: validate
         env:
+          EVENT_NAME: ${{ github.event_name }}
           INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
           INPUT_ENV: ${{ inputs.environment }}
           GITHUB_SHA_DEFAULT: ${{ github.sha }}
+          MAIN_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
 
-          # 1. Resolve commit SHA
-          TARGET_SHA="${INPUT_COMMIT_SHA}"
-          if [ -z "$TARGET_SHA" ]; then
-            TARGET_SHA="${GITHUB_SHA_DEFAULT}"
+          # 1. Resolve target environment and commit SHA
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            # Automatic release: promote the develop commit that was tested on NON-PROD.
+            # For a "develop -> main" merge commit that is its second parent; for a
+            # fast-forward or single-parent commit on main it is the commit itself.
+            INPUT_ENV="production"
+            parents=$(git rev-list --parents -n 1 "$MAIN_RUN_SHA")
+            set -- $parents
+            if [ "$#" -ge 3 ]; then
+              TARGET_SHA="$3"
+              echo "Main commit ${MAIN_RUN_SHA} is a merge; promoting tested develop commit ${TARGET_SHA}."
+            else
+              TARGET_SHA="$MAIN_RUN_SHA"
+              echo "Main commit ${MAIN_RUN_SHA} is not a merge; promoting it directly."
+            fi
+          else
+            TARGET_SHA="${INPUT_COMMIT_SHA}"
+            if [ -z "$TARGET_SHA" ]; then
+              TARGET_SHA="${GITHUB_SHA_DEFAULT}"
+            fi
           fi
 
           # 2. Strict 40-character hexadecimal regex check
@@ -128,6 +165,7 @@ jobs:
             exit 1
           fi
 
+          echo "environment=${INPUT_ENV}" >> "$GITHUB_OUTPUT"
           echo "commit_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
           echo "image_tag=sha-${TARGET_SHA}" >> "$GITHUB_OUTPUT"
           echo "frontend_image=ghcr.io/${GITHUB_REPOSITORY,,}-frontend:sha-${TARGET_SHA}" >> "$GITHUB_OUTPUT"
@@ -264,7 +302,7 @@ jobs:
     name: Deploy to Staging (CC-NPR)
     runs-on: ubuntu-latest
     needs: validate
-    if: inputs.environment == 'staging'
+    if: needs.validate.outputs.environment == 'staging'
     environment: staging
 
     steps:
@@ -431,7 +469,7 @@ jobs:
     needs:
       - validate
       - deploy-staging
-    if: inputs.environment == 'staging'
+    if: needs.validate.outputs.environment == 'staging'
     uses: ./.github/workflows/regression.yml
     with:
       commit_sha: ${{ needs.validate.outputs.commit_sha }}
@@ -444,7 +482,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: validate
-    if: inputs.environment == 'production'
+    if: needs.validate.outputs.environment == 'production'
     environment: production
 
     steps:
@@ -467,6 +505,8 @@ jobs:
           echo "Production credentials verified isolated and present."
 
       - name: Verify Explicit Production Authorization
+        # Manual runs must type CONFIRM; for automatic releases the merge into main is the authorization.
+        if: github.event_name == 'workflow_dispatch'
         env:
           CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
         run: |
