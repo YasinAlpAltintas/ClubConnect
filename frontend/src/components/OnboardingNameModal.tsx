@@ -64,7 +64,7 @@ export default function OnboardingNameModal({
       aria-modal="true"
       aria-labelledby="onboarding-modal-title"
       data-testid="onboarding-name-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-aurora-scrim/60 backdrop-blur-xs animate-in fade-in duration-200"
     >
       <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 sm:p-8 shadow-2xl ring-1 ring-aurora-border">
         {/* Header Icon & Title */}
@@ -87,7 +87,7 @@ export default function OnboardingNameModal({
         </p>
 
         {formError && (
-          <div role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-xs font-medium text-red-400 ring-1 ring-red-500/20">
+          <div role="alert" className="mt-4 rounded-xl bg-aurora-danger/10 p-3 text-xs font-medium text-aurora-danger-bright ring-1 ring-aurora-danger/20">
             {formError}
           </div>
         )}
@@ -109,11 +109,11 @@ export default function OnboardingNameModal({
               }}
               placeholder={t('onboarding.firstNamePlaceholder')}
               className={`mt-1.5 w-full rounded-xl bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text ring-1 ring-aurora-border placeholder:text-aurora-text-muted focus:outline-hidden focus:ring-2 focus:ring-aurora-primary transition-all ${
-                firstNameError ? 'ring-red-500/50' : ''
+                firstNameError ? 'ring-aurora-danger/50' : ''
               }`}
             />
             {firstNameError && (
-              <p className="mt-1 text-xs text-red-400 font-medium">{firstNameError}</p>
+              <p className="mt-1 text-xs text-aurora-danger-bright font-medium">{firstNameError}</p>
             )}
           </div>
 
@@ -132,11 +132,11 @@ export default function OnboardingNameModal({
               }}
               placeholder={t('onboarding.lastNamePlaceholder')}
               className={`mt-1.5 w-full rounded-xl bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text ring-1 ring-aurora-border placeholder:text-aurora-text-muted focus:outline-hidden focus:ring-2 focus:ring-aurora-primary transition-all ${
-                lastNameError ? 'ring-red-500/50' : ''
+                lastNameError ? 'ring-aurora-danger/50' : ''
               }`}
             />
             {lastNameError && (
-              <p className="mt-1 text-xs text-red-400 font-medium">{lastNameError}</p>
+              <p className="mt-1 text-xs text-aurora-danger-bright font-medium">{lastNameError}</p>
             )}
           </div>
 
@@ -145,11 +145,11 @@ export default function OnboardingNameModal({
               type="submit"
               data-testid="onboarding-submit-btn"
               disabled={isSubmitting}
-              className="btn-tactile w-full inline-flex items-center justify-center rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover disabled:opacity-60 cursor-pointer transition-all"
+              className="btn-tactile w-full inline-flex items-center justify-center rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover disabled:opacity-60 cursor-pointer transition-all"
             >
               {isSubmitting ? (
                 <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-aurora-on-accent border-r-transparent" />
                   {t('onboarding.submitting')}
                 </>
               ) : (

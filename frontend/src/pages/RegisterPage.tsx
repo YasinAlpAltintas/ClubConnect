@@ -82,7 +82,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
           className="w-full max-w-md rounded-2xl bg-aurora-surface p-8 text-center shadow-xl ring-1 ring-aurora-border"
           aria-live="polite"
         >
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-aurora-success/10 text-aurora-success-bright ring-1 ring-aurora-success/20">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
@@ -98,7 +98,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
               <button
                 type="button"
                 onClick={onNavigateToLogin}
-                className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
+                className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
               >
                 {t('register.loginLink')}
               </button>
@@ -143,7 +143,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
             {serverError && (
               <div
                 role="alert"
-                className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 ring-red-500/20"
+                className="rounded-xl bg-aurora-danger/10 px-4 py-3 text-sm text-aurora-danger-bright ring-1 ring-aurora-danger/20"
               >
                 {serverError.key === 'unexpected'
                   ? t('register.api.unexpected', { status: serverError.status })
@@ -164,7 +164,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                 aria-describedby={errors.email || emailConflict ? 'email-error' : undefined}
                 className={`mt-1.5 block w-full rounded-xl border bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 ${
                   errors.email || fieldError === 'email' || emailConflict
-                    ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/20'
+                    ? 'border-aurora-danger/80 focus:border-aurora-danger focus:ring-aurora-danger/20'
                     : 'border-aurora-border focus:border-aurora-primary focus:ring-aurora-primary/20'
                 }`}
                 {...register('email', {
@@ -180,7 +180,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                 })}
               />
               {emailConflict ? (
-                <div id="email-error" className="mt-1.5 flex items-center justify-between text-xs font-medium text-red-400">
+                <div id="email-error" className="mt-1.5 flex items-center justify-between text-xs font-medium text-aurora-danger-bright">
                   <span>{t('register.api.conflict')}</span>
                   {onNavigateToLogin && (
                     <button
@@ -194,7 +194,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                   )}
                 </div>
               ) : errors.email ? (
-                <p id="email-error" className="mt-1.5 text-xs font-medium text-red-400">
+                <p id="email-error" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                   {t(`register.errors.${errors.email.message ?? 'required'}`, {
                     min: 8,
                   })}
@@ -214,13 +214,13 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
                 aria-describedby={errors.password ? 'password-error' : undefined}
                 className={`mt-1.5 block w-full rounded-xl border bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 ${
                   errors.password || fieldError === 'password'
-                    ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/20'
+                    ? 'border-aurora-danger/80 focus:border-aurora-danger focus:ring-aurora-danger/20'
                     : 'border-aurora-border focus:border-aurora-primary focus:ring-aurora-primary/20'
                 }`}
                 {...register('password')}
               />
               {errors.password && (
-                <p id="password-error" className="mt-1.5 text-xs font-medium text-red-400">
+                <p id="password-error" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                   {t(`register.errors.${errors.password.message ?? 'required'}`, {
                     min: 8,
                   })}
@@ -231,7 +231,7 @@ export default function RegisterPage({ onNavigateToLogin }: RegisterPageProps = 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
               {isSubmitting ? t('register.submitting') : t('register.submit')}
             </button>
