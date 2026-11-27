@@ -300,7 +300,7 @@ export default function DashboardPage({
             <span className="text-xl font-bold tracking-tight text-aurora-primary">
               {t('app.name')}
             </span>
-            <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20">
+            <span className="rounded-full bg-aurora-danger/10 px-2.5 py-0.5 text-xs font-medium text-aurora-danger-bright ring-1 ring-aurora-danger/20">
               {t('dashboard.accessDenied')}
             </span>
           </div>
@@ -336,7 +336,7 @@ export default function DashboardPage({
         </header>
 
         <div className="mx-auto flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-red-400 ring-1 ring-red-500/20">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-aurora-danger/10 text-aurora-danger-bright ring-1 ring-aurora-danger/20">
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.5a9.75 9.75 0 110 19.5 9.75 9.75 0 010-19.5zm.008 14.25h-.016a.75.75 0 01-.742-.75.75.75 0 01.75-.75h.008a.75.75 0 01.75.75.75.75 0 01-.75.75z" />
             </svg>
@@ -355,7 +355,7 @@ export default function DashboardPage({
                 type="button"
                 data-testid="access-denied-dashboard-btn"
                 onClick={() => navigateToSubView('overview')}
-                className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
+                className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
               >
                 {t('members.backToDashboard')}
               </button>
@@ -524,8 +524,8 @@ export default function DashboardPage({
               data-testid={promoteNotification.type === 'success' ? 'promote-success-alert' : 'promote-error-alert'}
               className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
                 promoteNotification.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
-                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+                  ? 'bg-aurora-success/10 text-aurora-success-soft ring-aurora-success/20'
+                  : 'bg-aurora-danger/10 text-aurora-danger-soft ring-aurora-danger/20'
               }`}
               role="alert"
             >
@@ -545,8 +545,8 @@ export default function DashboardPage({
               data-testid={removeNotification.type === 'success' ? 'remove-success-alert' : 'remove-error-alert'}
               className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
                 removeNotification.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
-                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+                  ? 'bg-aurora-success/10 text-aurora-success-soft ring-aurora-success/20'
+                  : 'bg-aurora-danger/10 text-aurora-danger-soft ring-aurora-danger/20'
               }`}
               role="alert"
             >
@@ -566,8 +566,8 @@ export default function DashboardPage({
               data-testid={demoteNotification.type === 'success' ? 'demote-success-alert' : 'demote-error-alert'}
               className={`mb-6 flex items-center justify-between rounded-xl p-4 text-xs font-medium ring-1 ${
                 demoteNotification.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
-                  : 'bg-red-500/10 text-red-300 ring-red-500/20'
+                  ? 'bg-aurora-success/10 text-aurora-success-soft ring-aurora-success/20'
+                  : 'bg-aurora-danger/10 text-aurora-danger-soft ring-aurora-danger/20'
               }`}
               role="alert"
             >
@@ -697,7 +697,7 @@ export default function DashboardPage({
                         data-testid="dashboard-role-badge"
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                           currentClub.role === 'Club Admin'
-                            ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20'
+                            ? 'bg-aurora-warning/10 text-aurora-warning-soft ring-aurora-warning/20'
                             : 'bg-aurora-primary/10 text-aurora-muted ring-aurora-primary/20'
                         }`}
                       >
@@ -782,7 +782,7 @@ export default function DashboardPage({
                     type="button"
                     data-testid="dashboard-calendar-btn"
                     onClick={() => navigateToSubView('calendar')}
-                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-primary hover:text-white cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-primary hover:text-aurora-on-accent cursor-pointer transition-all flex items-center justify-center gap-1.5"
                   >
                     <span>{t('calendar.openCalendar')}</span>
                     <span aria-hidden="true">→</span>
@@ -812,7 +812,7 @@ export default function DashboardPage({
                     type="button"
                     data-testid="dashboard-tasks-btn"
                     onClick={() => navigateToSubView('tasks')}
-                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-secondary hover:text-white cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                    className="w-full btn-tactile rounded-xl bg-aurora-elevated px-3 py-2 text-xs font-semibold text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-secondary hover:text-aurora-on-accent cursor-pointer transition-all flex items-center justify-center gap-1.5"
                   >
                     <span>{t('tasks.openBoard')}</span>
                     <span aria-hidden="true">→</span>
@@ -821,10 +821,10 @@ export default function DashboardPage({
               </article>
 
               {/* Logistics & Inventory */}
-              <article className="rounded-2xl bg-aurora-surface p-6 shadow-xs ring-1 ring-aurora-border flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 hover:ring-emerald-500/30">
+              <article className="rounded-2xl bg-aurora-surface p-6 shadow-xs ring-1 ring-aurora-border flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5 hover:ring-aurora-success/30">
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-aurora-success/10 text-aurora-success-bright ring-1 ring-aurora-success/20">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                       </svg>

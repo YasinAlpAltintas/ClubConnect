@@ -74,13 +74,13 @@ export default function KanbanBoard({ tasks, isLoading = false, isError = false,
   if (isError) {
     return (
       <div data-testid="kanban-error" role="alert" className="rounded-2xl bg-aurora-surface py-12 text-center ring-1 ring-aurora-border">
-        <p className="text-sm font-medium text-red-400">{t('tasks.errorMessage')}</p>
+        <p className="text-sm font-medium text-aurora-danger-bright">{t('tasks.errorMessage')}</p>
         {onRetry && (
           <button
             type="button"
             data-testid="kanban-retry-btn"
             onClick={onRetry}
-            className="btn-tactile mt-4 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white hover:bg-aurora-primary-hover cursor-pointer"
+            className="btn-tactile mt-4 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent hover:bg-aurora-primary-hover cursor-pointer"
           >
             {t('tasks.retry')}
           </button>

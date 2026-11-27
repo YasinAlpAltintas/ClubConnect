@@ -369,7 +369,7 @@ export default function LobbyPage({
               </div>
 
               {onboardingError && (
-                <p className="mt-2 text-xs text-red-400 font-medium">{onboardingError}</p>
+                <p className="mt-2 text-xs text-aurora-danger-bright font-medium">{onboardingError}</p>
               )}
 
               <form onSubmit={handleInlineSaveName} className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -393,7 +393,7 @@ export default function LobbyPage({
                   type="submit"
                   data-testid="onboarding-submit-btn"
                   disabled={isOnboardingSubmitting}
-                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all shrink-0"
+                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all shrink-0"
                 >
                   {isOnboardingSubmitting ? t('onboarding.submitting') : t('onboarding.submit')}
                 </button>
@@ -412,7 +412,7 @@ export default function LobbyPage({
             <div data-testid="active-workspace-banner" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-aurora-secondary">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+                  <span className="h-2 w-2 rounded-full bg-aurora-success-bright" aria-hidden="true" />
                   <h2>{t('lobby.activeWorkspaceTitle')}</h2>
                 </div>
                 <div className="mt-2 text-2xl font-bold tracking-tight text-aurora-text sm:text-3xl" data-testid="active-workspace-club-name">
@@ -433,7 +433,7 @@ export default function LobbyPage({
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${
                       activeClub.role === 'Club Admin'
-                        ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20'
+                        ? 'bg-aurora-warning/10 text-aurora-warning-soft ring-aurora-warning/20'
                         : 'bg-aurora-primary/10 text-aurora-muted ring-aurora-primary/20'
                     }`}
                   >
@@ -444,7 +444,7 @@ export default function LobbyPage({
                   type="button"
                   data-testid="enter-active-dashboard-btn"
                   onClick={() => onEnterDashboard?.(activeClub.id)}
-                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
+                  className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
                 >
                   {t('lobby.enterDashboard')} →
                 </button>
@@ -494,7 +494,7 @@ export default function LobbyPage({
                   <button
                     type="button"
                     onClick={() => setModalType('create')}
-                    className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
+                    className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-3.5 py-1.5 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
                   >
                     <svg className="mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -571,7 +571,7 @@ export default function LobbyPage({
                   <button
                     type="button"
                     onClick={() => setModalType('explore')}
-                    className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-6 py-3 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
+                    className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-6 py-3 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
                   >
                     <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -621,11 +621,11 @@ export default function LobbyPage({
                     <button
                       type="submit"
                       disabled={isJoiningEmpty}
-                      className="btn-tactile inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-aurora-primary px-4 py-2 text-sm font-semibold text-white hover:bg-aurora-primary-hover disabled:opacity-60 cursor-pointer"
+                      className="btn-tactile inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-aurora-primary px-4 py-2 text-sm font-semibold text-aurora-on-accent hover:bg-aurora-primary-hover disabled:opacity-60 cursor-pointer"
                     >
                       {isJoiningEmpty ? (
                         <>
-                          <div className="mr-2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                          <div className="mr-2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-aurora-on-accent border-r-transparent" />
                           {t('lobby.joinModal.submitting')}
                         </>
                       ) : (
@@ -635,13 +635,13 @@ export default function LobbyPage({
                   </form>
 
                   {codeError && (
-                    <p role="alert" className="mt-2 text-xs font-medium text-red-400">
+                    <p role="alert" className="mt-2 text-xs font-medium text-aurora-danger-bright">
                       {codeError}
                     </p>
                   )}
 
                   {codeSubmitted && emptySuccessMessage && (
-                    <div role="status" className="mt-3 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
+                    <div role="status" className="mt-3 rounded-xl bg-aurora-success/10 px-3 py-2 text-xs font-medium text-aurora-success-bright ring-1 ring-aurora-success/20">
                       {emptySuccessMessage}
                     </div>
                   )}
@@ -713,7 +713,7 @@ export default function LobbyPage({
                       <div className="flex items-center space-x-2 truncate pr-2">
                         <h3 className="font-semibold text-aurora-text truncate">{club.name}</h3>
                         {isActive && (
-                          <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
+                          <span className="shrink-0 rounded-full bg-aurora-success/10 px-2 py-0.5 text-[10px] font-semibold text-aurora-success-bright ring-1 ring-aurora-success/20">
                             {t('lobby.currentlyActive')}
                           </span>
                         )}
@@ -722,7 +722,7 @@ export default function LobbyPage({
                         <span
                           className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
                             club.role === 'Club Admin'
-                              ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20'
+                              ? 'bg-aurora-warning/10 text-aurora-warning-soft ring-aurora-warning/20'
                               : 'bg-aurora-primary/10 text-aurora-muted ring-aurora-primary/20'
                           }`}
                         >
@@ -744,7 +744,7 @@ export default function LobbyPage({
                             setActiveClubId(club.id)
                             onEnterDashboard?.(club.id)
                           }}
-                          className="btn-tactile inline-flex items-center rounded-xl bg-aurora-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
+                          className="btn-tactile inline-flex items-center rounded-xl bg-aurora-primary px-3 py-1.5 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors"
                         >
                           {t('lobby.enterDashboard')} →
                         </button>
@@ -786,7 +786,7 @@ export default function LobbyPage({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 p-4 backdrop-blur-xs"
         >
           <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-2xl ring-1 ring-aurora-border text-aurora-text">
             <h3 className="text-lg font-bold tracking-tight text-aurora-text">
@@ -799,7 +799,7 @@ export default function LobbyPage({
               <button
                 type="button"
                 onClick={closeModal}
-                className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-sm font-semibold text-white hover:bg-aurora-primary-hover cursor-pointer"
+                className="btn-tactile rounded-xl bg-aurora-primary px-4 py-2 text-sm font-semibold text-aurora-on-accent hover:bg-aurora-primary-hover cursor-pointer"
               >
                 {t('lobby.empty.dialogClose')}
               </button>
@@ -814,7 +814,7 @@ export default function LobbyPage({
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-club-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 p-4 backdrop-blur-xs"
         >
           <div className="w-full max-w-lg rounded-2xl bg-aurora-surface p-6 shadow-2xl ring-1 ring-aurora-border sm:p-8 text-aurora-text">
             <div className="flex items-start justify-between">
@@ -841,14 +841,14 @@ export default function LobbyPage({
 
             <form onSubmit={handleCreateClubSubmit} className="mt-6 space-y-4">
               {formError && (
-                <div role="alert" className="rounded-xl bg-red-500/10 p-3.5 text-sm text-red-400 ring-1 ring-red-500/20">
+                <div role="alert" className="rounded-xl bg-aurora-danger/10 p-3.5 text-sm text-aurora-danger-bright ring-1 ring-aurora-danger/20">
                   {formError}
                 </div>
               )}
 
               <div>
                 <label htmlFor="club-name" className="block text-sm font-medium text-aurora-text">
-                  {t('lobby.createModal.nameLabel')} <span className="text-red-400">*</span>
+                  {t('lobby.createModal.nameLabel')} <span className="text-aurora-danger-bright">*</span>
                 </label>
                 <input
                   type="text"
@@ -865,7 +865,7 @@ export default function LobbyPage({
                   className="mt-1.5 block w-full rounded-xl border border-aurora-border bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text placeholder:text-aurora-text-muted focus:border-aurora-primary focus:outline-none focus:ring-2 focus:ring-aurora-primary/30 disabled:opacity-50"
                 />
                 {nameError && (
-                  <p id="club-name-error" role="alert" className="mt-1.5 text-xs font-medium text-red-400">
+                  <p id="club-name-error" role="alert" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                     {nameError}
                   </p>
                 )}
@@ -898,11 +898,11 @@ export default function LobbyPage({
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-primary disabled:opacity-60 cursor-pointer"
+                  className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-5 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-primary disabled:opacity-60 cursor-pointer"
                 >
                   {isCreating ? (
                     <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-aurora-on-accent border-r-transparent" />
                       {t('lobby.createModal.submitting')}
                     </>
                   ) : (
@@ -921,7 +921,7 @@ export default function LobbyPage({
           role="dialog"
           aria-modal="true"
           aria-labelledby="join-club-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 p-4 backdrop-blur-xs"
         >
           <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-2xl ring-1 ring-aurora-border sm:p-8 text-aurora-text">
             <div className="flex items-start justify-between">
@@ -948,14 +948,14 @@ export default function LobbyPage({
 
             <form onSubmit={handleModalJoinSubmit} className="mt-6 space-y-4">
               {modalFormError && (
-                <div role="alert" className="rounded-xl bg-red-500/10 p-3.5 text-sm text-red-400 ring-1 ring-red-500/20">
+                <div role="alert" className="rounded-xl bg-aurora-danger/10 p-3.5 text-sm text-aurora-danger-bright ring-1 ring-aurora-danger/20">
                   {modalFormError}
                 </div>
               )}
 
               <div>
                 <label htmlFor="modal-invite-code" className="block text-sm font-medium text-aurora-text">
-                  {t('lobby.joinModal.codeLabel')} <span className="text-red-400">*</span>
+                  {t('lobby.joinModal.codeLabel')} <span className="text-aurora-danger-bright">*</span>
                 </label>
                 <input
                   type="text"
@@ -980,7 +980,7 @@ export default function LobbyPage({
                   className="mt-1.5 block w-full rounded-xl border border-aurora-border bg-aurora-bg px-3.5 py-2.5 text-center text-lg font-mono tracking-widest text-aurora-text placeholder:font-sans placeholder:tracking-normal placeholder:text-aurora-text-muted focus:border-aurora-primary focus:outline-none focus:ring-2 focus:ring-aurora-primary/30 disabled:opacity-50"
                 />
                 {modalCodeError && (
-                  <p id="modal-code-error" role="alert" className="mt-1.5 text-xs font-medium text-red-400">
+                  <p id="modal-code-error" role="alert" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                     {modalCodeError}
                   </p>
                 )}
@@ -998,11 +998,11 @@ export default function LobbyPage({
                 <button
                   type="submit"
                   disabled={isJoiningModal}
-                  className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-primary disabled:opacity-60 cursor-pointer"
+                  className="btn-tactile inline-flex items-center justify-center rounded-xl bg-aurora-primary px-5 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aurora-primary disabled:opacity-60 cursor-pointer"
                 >
                   {isJoiningModal ? (
                     <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-aurora-on-accent border-r-transparent" />
                       {t('lobby.joinModal.submitting')}
                     </>
                   ) : (
@@ -1021,8 +1021,8 @@ export default function LobbyPage({
         className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full bg-aurora-surface/90 px-3 py-1.5 text-xs font-medium text-aurora-text ring-1 ring-aurora-border shadow-md backdrop-blur-md select-none"
       >
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-aurora-success-bright opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-aurora-success" />
         </span>
         <span className="text-aurora-text-secondary">{t('lobby.connected', 'Connected')}</span>
       </div>

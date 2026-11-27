@@ -86,9 +86,9 @@ export default function ClubMembersTable({
     return (
       <div
         data-testid="members-error"
-        className="flex flex-col items-center justify-center rounded-2xl bg-aurora-surface p-8 text-center shadow-xs ring-1 ring-red-500/20"
+        className="flex flex-col items-center justify-center rounded-2xl bg-aurora-surface p-8 text-center shadow-xs ring-1 ring-aurora-danger/20"
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-aurora-danger/10 text-aurora-danger-bright">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -104,7 +104,7 @@ export default function ClubMembersTable({
             type="button"
             data-testid="members-retry-btn"
             onClick={onRetry}
-            className="btn-tactile mt-5 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
+            className="btn-tactile mt-5 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer"
           >
             {t('common.retry', 'Retry')}
           </button>
@@ -212,7 +212,7 @@ export default function ClubMembersTable({
                       data-testid={`member-role-${member.memberId}`}
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                         member.role === 'Club Admin'
-                          ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20'
+                          ? 'bg-aurora-warning/10 text-aurora-warning-soft ring-aurora-warning/20'
                           : 'bg-aurora-primary/10 text-aurora-muted ring-aurora-primary/20'
                       }`}
                     >
@@ -269,7 +269,7 @@ export default function ClubMembersTable({
                                 data-testid={`demote-member-${member.memberId}`}
                                 disabled={isPromotingMemberId === member.memberId || isDemotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
                                 onClick={() => setMemberPendingDemotion(member)}
-                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-400 ring-1 ring-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50 cursor-pointer transition-colors"
+                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-warning/10 px-3 py-1.5 font-semibold text-aurora-warning-bright ring-1 ring-aurora-warning/20 hover:bg-aurora-warning/20 disabled:opacity-50 cursor-pointer transition-colors"
                                 aria-label={t('members.actions.demoteAria', { name: displayName })}
                               >
                                 {isDemotingMemberId === member.memberId ? (
@@ -296,7 +296,7 @@ export default function ClubMembersTable({
                                 data-testid={`remove-member-${member.memberId}`}
                                 disabled={isPromotingMemberId === member.memberId || isDemotingMemberId === member.memberId || isRemovingMemberId === member.memberId}
                                 onClick={() => setMemberPendingRemoval(member)}
-                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 font-semibold text-red-400 ring-1 ring-red-500/20 hover:bg-red-500/20 disabled:opacity-50 cursor-pointer transition-colors"
+                                className="btn-tactile inline-flex items-center gap-1.5 rounded-lg bg-aurora-danger/10 px-3 py-1.5 font-semibold text-aurora-danger-bright ring-1 ring-aurora-danger/20 hover:bg-aurora-danger/20 disabled:opacity-50 cursor-pointer transition-colors"
                                 aria-label={t('members.actions.removeAria', { name: displayName })}
                               >
                                 {isRemovingMemberId === member.memberId ? (
@@ -335,11 +335,11 @@ export default function ClubMembersTable({
           aria-modal="true"
           aria-labelledby="remove-modal-title"
           data-testid="remove-member-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 p-4 backdrop-blur-xs"
         >
           <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border">
             <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-400 ring-1 ring-red-500/20">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-aurora-danger/10 text-aurora-danger-bright ring-1 ring-aurora-danger/20">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -377,7 +377,7 @@ export default function ClubMembersTable({
                     await onRemoveMember(idToRemove)
                   }
                 }}
-                className="btn-tactile rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-600 disabled:opacity-50 cursor-pointer transition-colors"
+                className="btn-tactile rounded-xl bg-aurora-danger px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-danger-strong disabled:opacity-50 cursor-pointer transition-colors"
               >
                 {t('members.actions.confirmRemove', 'Remove Member')}
               </button>
@@ -392,11 +392,11 @@ export default function ClubMembersTable({
           aria-modal="true"
           aria-labelledby="demote-modal-title"
           data-testid="demote-member-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 p-4 backdrop-blur-xs"
         >
           <div className="w-full max-w-md rounded-2xl bg-aurora-surface p-6 shadow-xl ring-1 ring-aurora-border">
             <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-aurora-warning/10 text-aurora-warning-bright ring-1 ring-aurora-warning/20">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -434,7 +434,7 @@ export default function ClubMembersTable({
                     await onDemoteMember(idToDemote)
                   }
                 }}
-                className="btn-tactile rounded-xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-600 disabled:opacity-50 cursor-pointer transition-colors"
+                className="btn-tactile rounded-xl bg-aurora-warning px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-warning-strong disabled:opacity-50 cursor-pointer transition-colors"
               >
                 {t('members.actions.confirmDemote', 'Demote to Member')}
               </button>

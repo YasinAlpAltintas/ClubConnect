@@ -114,7 +114,7 @@ export default function InviteCodeCard({
               type="button"
               data-testid="members-copy-invite-code"
               onClick={() => void handleCopy()}
-              className="btn-tactile inline-flex items-center gap-1.5 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-all"
+              className="btn-tactile inline-flex items-center gap-1.5 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-all"
               aria-label={t('members.invite.copyButton')}
             >
               {copied ? (

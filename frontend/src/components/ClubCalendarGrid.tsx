@@ -399,13 +399,13 @@ export default function ClubCalendarGrid({
       {successBanner && (
         <div
           data-testid="calendar-success-banner"
-          className="mb-4 flex items-center justify-between rounded-xl bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-400 ring-1 ring-emerald-500/20"
+          className="mb-4 flex items-center justify-between rounded-xl bg-aurora-success/10 px-4 py-2.5 text-xs font-semibold text-aurora-success-bright ring-1 ring-aurora-success/20"
         >
           <span>{successBanner}</span>
           <button
             type="button"
             onClick={() => setSuccessBanner(null)}
-            className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
+            className="text-aurora-success-bright hover:text-aurora-success-soft cursor-pointer"
           >
             ✕
           </button>
@@ -443,7 +443,7 @@ export default function ClubCalendarGrid({
               type="button"
               data-testid="calendar-new-event-btn"
               onClick={() => openCreateModal()}
-              className="btn-tactile rounded-xl bg-aurora-primary px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors mr-1"
+              className="btn-tactile rounded-xl bg-aurora-primary px-3 py-1.5 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer transition-colors mr-1"
             >
               + {t('calendar.newEvent.button', 'New Event')}
             </button>
@@ -494,7 +494,7 @@ export default function ClubCalendarGrid({
 
       {isError && (
         <div data-testid="calendar-error-banner" className="py-12 text-center">
-          <p className="text-sm font-medium text-red-400">
+          <p className="text-sm font-medium text-aurora-danger-bright">
             {errorMessage || t('calendar.errorMessage', 'Failed to retrieve club events.')}
           </p>
           {onRetry && (
@@ -502,7 +502,7 @@ export default function ClubCalendarGrid({
               type="button"
               data-testid="calendar-retry-btn"
               onClick={onRetry}
-              className="mt-4 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-white hover:bg-aurora-primary-hover cursor-pointer"
+              className="mt-4 rounded-xl bg-aurora-primary px-4 py-2 text-xs font-semibold text-aurora-on-accent hover:bg-aurora-primary-hover cursor-pointer"
             >
               Retry
             </button>
@@ -550,7 +550,7 @@ export default function ClubCalendarGrid({
                     <span
                       className={`text-xs font-semibold rounded-full h-6 w-6 flex items-center justify-center ${
                         cell.isToday
-                          ? 'bg-aurora-primary text-white font-bold'
+                          ? 'bg-aurora-primary text-aurora-on-accent font-bold'
                           : 'text-aurora-text'
                       }`}
                     >
@@ -583,7 +583,7 @@ export default function ClubCalendarGrid({
                         <span>{evt.title}</span>
                         {evt.isAttending && (
                           <span
-                            className="ml-1 text-[10px] text-emerald-400 font-bold"
+                            className="ml-1 text-[10px] text-aurora-success-bright font-bold"
                             title={t('calendar.rsvp.youAreAttending', "You're attending")}
                           >
                             ✓
@@ -619,7 +619,7 @@ export default function ClubCalendarGrid({
       {selectedEvent && (
         <div
           data-testid="calendar-event-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 backdrop-blur-xs p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="event-dialog-title"
@@ -654,7 +654,7 @@ export default function ClubCalendarGrid({
                 {editFormError && (
                   <div
                     data-testid="edit-event-error"
-                    className="mt-4 rounded-xl bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20"
+                    className="mt-4 rounded-xl bg-aurora-danger/10 px-4 py-2.5 text-xs font-medium text-aurora-danger-bright ring-1 ring-aurora-danger/20"
                   >
                     {editFormError}
                   </div>
@@ -775,7 +775,7 @@ export default function ClubCalendarGrid({
                       type="submit"
                       data-testid="edit-event-submit-btn"
                       disabled={isEditSubmitting}
-                      className="btn-tactile rounded-xl bg-aurora-primary px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all"
+                      className="btn-tactile rounded-xl bg-aurora-primary px-5 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all"
                     >
                       {isEditSubmitting ? t('calendar.eventDetails.saving', 'Saving…') : t('calendar.eventDetails.save', 'Save Changes')}
                     </button>
@@ -834,7 +834,7 @@ export default function ClubCalendarGrid({
 
                   {selectedEvent.location && (
                     <div className="flex items-center space-x-2 text-aurora-text-secondary">
-                      <svg className="h-4 w-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4 text-aurora-success-bright shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -856,7 +856,7 @@ export default function ClubCalendarGrid({
                     {selectedEvent.isAttending && (
                       <span
                         data-testid="event-user-attending-badge"
-                        className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20"
+                        className="inline-flex items-center gap-1 rounded-full bg-aurora-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-aurora-success-bright ring-1 ring-aurora-success/20"
                       >
                         ✓ {t('calendar.rsvp.youAreAttending', "You're attending")}
                       </span>
@@ -904,7 +904,7 @@ export default function ClubCalendarGrid({
                   {rsvpError && (
                     <div
                       data-testid="event-rsvp-error"
-                      className="mt-2 rounded-xl bg-red-500/10 px-3 py-1.5 text-xs text-red-400 ring-1 ring-red-500/20"
+                      className="mt-2 rounded-xl bg-aurora-danger/10 px-3 py-1.5 text-xs text-aurora-danger-bright ring-1 ring-aurora-danger/20"
                     >
                       {rsvpError}
                     </div>
@@ -919,8 +919,8 @@ export default function ClubCalendarGrid({
                     disabled={isRsvpSubmitting}
                     className={`btn-tactile inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer transition-all ${
                       selectedEvent.isAttending
-                        ? 'bg-aurora-elevated text-aurora-text ring-1 ring-aurora-border hover:bg-red-500/10 hover:text-red-400 hover:ring-red-500/30'
-                        : 'bg-aurora-primary text-white shadow-xs hover:bg-aurora-primary-hover'
+                        ? 'bg-aurora-elevated text-aurora-text ring-1 ring-aurora-border hover:bg-aurora-danger/10 hover:text-aurora-danger-bright hover:ring-aurora-danger/30'
+                        : 'bg-aurora-primary text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover'
                     }`}
                   >
                     <span>{selectedEvent.isAttending ? '✕' : '✓'}</span>
@@ -949,7 +949,7 @@ export default function ClubCalendarGrid({
       {isNewEventModalOpen && (
         <div
           data-testid="new-event-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-aurora-scrim/60 backdrop-blur-xs p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="new-event-title"
@@ -980,7 +980,7 @@ export default function ClubCalendarGrid({
             </div>
 
             {formError && (
-              <div data-testid="new-event-error" className="mt-4 rounded-xl bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20">
+              <div data-testid="new-event-error" className="mt-4 rounded-xl bg-aurora-danger/10 px-4 py-2.5 text-xs font-medium text-aurora-danger-bright ring-1 ring-aurora-danger/20">
                 {formError}
               </div>
             )}
@@ -1100,7 +1100,7 @@ export default function ClubCalendarGrid({
                   type="submit"
                   data-testid="new-event-submit-btn"
                   disabled={isSubmitting}
-                  className="btn-tactile rounded-xl bg-aurora-primary px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all"
+                  className="btn-tactile rounded-xl bg-aurora-primary px-5 py-2 text-xs font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover cursor-pointer disabled:opacity-60 transition-all"
                 >
                   {isSubmitting ? t('calendar.newEvent.submitting', 'Scheduling…') : t('calendar.newEvent.submit', 'Schedule Event')}
                 </button>

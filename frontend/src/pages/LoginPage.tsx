@@ -84,7 +84,7 @@ export default function LoginPage({
             {showExpiredNotice && (
               <div
                 role="alert"
-                className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-300 ring-1 ring-amber-500/20"
+                className="rounded-xl bg-aurora-warning/10 px-4 py-3 text-sm text-aurora-warning-soft ring-1 ring-aurora-warning/20"
               >
                 {t('login.sessionExpired')}
               </div>
@@ -93,7 +93,7 @@ export default function LoginPage({
             {serverError && (
               <div
                 role="alert"
-                className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400 ring-1 ring-red-500/20"
+                className="rounded-xl bg-aurora-danger/10 px-4 py-3 text-sm text-aurora-danger-bright ring-1 ring-aurora-danger/20"
               >
                 {serverError.key === 'unexpected'
                   ? t('login.api.unexpected', { status: serverError.status })
@@ -114,13 +114,13 @@ export default function LoginPage({
                 aria-describedby={errors.email ? 'email-error' : undefined}
                 className={`mt-1.5 block w-full rounded-xl border bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 ${
                   errors.email
-                    ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/20'
+                    ? 'border-aurora-danger/80 focus:border-aurora-danger focus:ring-aurora-danger/20'
                     : 'border-aurora-border focus:border-aurora-primary focus:ring-aurora-primary/20'
                 }`}
                 {...register('email')}
               />
               {errors.email && (
-                <p id="email-error" className="mt-1.5 text-xs font-medium text-red-400">
+                <p id="email-error" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                   {t(`login.errors.${errors.email.message ?? 'required'}`)}
                 </p>
               )}
@@ -138,13 +138,13 @@ export default function LoginPage({
                 aria-describedby={errors.password ? 'password-error' : undefined}
                 className={`mt-1.5 block w-full rounded-xl border bg-aurora-bg px-3.5 py-2.5 text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 ${
                   errors.password
-                    ? 'border-red-500/80 focus:border-red-500 focus:ring-red-500/20'
+                    ? 'border-aurora-danger/80 focus:border-aurora-danger focus:ring-aurora-danger/20'
                     : 'border-aurora-border focus:border-aurora-primary focus:ring-aurora-primary/20'
                 }`}
                 {...register('password')}
               />
               {errors.password && (
-                <p id="password-error" className="mt-1.5 text-xs font-medium text-red-400">
+                <p id="password-error" className="mt-1.5 text-xs font-medium text-aurora-danger-bright">
                   {t(`login.errors.${errors.password.message ?? 'required'}`)}
                 </p>
               )}
@@ -153,7 +153,7 @@ export default function LoginPage({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-aurora-primary-hover focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              className="btn-tactile w-full rounded-xl bg-aurora-primary px-4 py-2.5 text-sm font-semibold text-aurora-on-accent shadow-xs hover:bg-aurora-primary-hover focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
               {isSubmitting ? t('login.submitting') : t('login.submit')}
             </button>

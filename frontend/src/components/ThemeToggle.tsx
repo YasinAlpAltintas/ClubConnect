@@ -22,7 +22,7 @@ export default function ThemeToggle({ className = '' }: ThemeToggleProps) {
       className={`btn-tactile inline-flex items-center justify-center rounded-xl p-2 text-xs font-medium text-aurora-text-secondary ring-1 ring-aurora-border hover:bg-aurora-elevated hover:text-aurora-text cursor-pointer transition-colors ${className}`}
     >
       {isDark ? (
-        <svg className="h-4 w-4 text-amber-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4 text-aurora-warning-soft shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
