@@ -137,12 +137,14 @@ test.describe('INC-13: Access Club Dashboard from Lobby', () => {
     await expect(inviteSection).toContainText(club1.inviteCode)
     await expect(page.getByTestId('dashboard-copy-invite-code')).toBeVisible()
 
-    // 5. Verify the 3 Module Placeholder Cards with Coming Soon badges
+    // 5. Verify the 3 Module Cards. The Kanban board is live since INC-27, so it has
+    //    an "Open Task Board" button instead of a Coming Soon badge.
     await expect(page.getByText(/Calendar & Events|Kalender & Evenementen/i)).toBeVisible()
     await expect(page.getByText(/Kanban Task Board|Kanban-takenbord/i)).toBeVisible()
     await expect(page.getByText(/Logistics & Inventory|Logistiek & Voorraad/i)).toBeVisible()
+    await expect(page.getByTestId('dashboard-tasks-btn')).toBeVisible()
     const comingSoonBadges = page.getByText(/Coming Soon|Binnenkort beschikbaar/i)
-    await expect(comingSoonBadges).toHaveCount(3)
+    await expect(comingSoonBadges).toHaveCount(2)
 
     // 6. Test "← Back to Lobby" navigation
     const backBtn = page.getByTestId('back-to-lobby-btn')

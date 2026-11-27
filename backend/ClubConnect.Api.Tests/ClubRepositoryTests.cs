@@ -40,6 +40,29 @@ public class ClubRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetTasksForClubAsync_ReturnsOnlyClubTasks_OrderedByCreation_WithAssignee()
+    {
+        var member = await SeedMemberAsync("tasks-repo@example.com");
+        var clubA = new Club { Id = Guid.NewGuid(), Name = "Club A" };
+        var clubB = new Club { Id = Guid.NewGuid(), Name = "Club B" };
+        await _context.Clubs.AddRangeAsync(clubA, clubB);
+
+        var now = DateTimeOffset.UtcNow;
+        await _context.Tasks.AddRangeAsync(
+            new ClubTask { ClubId = clubA.Id, Title = "Second", CreatedByMemberId = member.Id, CreatedAtUtc = now },
+            new ClubTask { ClubId = clubA.Id, Title = "First", AssigneeMemberId = member.Id, CreatedByMemberId = member.Id, CreatedAtUtc = now.AddMinutes(-5) },
+            new ClubTask { ClubId = clubB.Id, Title = "Other club", CreatedByMemberId = member.Id, CreatedAtUtc = now });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var tasks = await NewRepository().GetTasksForClubAsync(clubA.Id, CancellationToken.None);
+
+        Assert.Equal(new[] { "First", "Second" }, tasks.Select(t => t.Title));
+        Assert.Equal("Test Member", tasks[0].Assignee?.DisplayName);
+        Assert.Null(tasks[1].Assignee);
+    }
+
+    [Fact]
     public async Task CreateClubWithAdminAsync_PersistsClubAndAdminMembership()
     {
         var member = await SeedMemberAsync();

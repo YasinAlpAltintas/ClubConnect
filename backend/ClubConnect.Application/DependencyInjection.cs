@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<CreateClubEventUseCase>();
         services.AddScoped<UpdateClubEventUseCase>();
         services.AddScoped<SetEventRsvpUseCase>();
+        services.AddScoped<GetClubTasksUseCase>();
         return services;
     }
 }

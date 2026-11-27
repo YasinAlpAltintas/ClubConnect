@@ -26,6 +26,8 @@ public class ClubConnectDbContext : DbContext
 
     public DbSet<ClubEventAttendee> EventAttendees => Set<ClubEventAttendee>();
 
+    public DbSet<ClubTask> Tasks => Set<ClubTask>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // The Application layer canonicalizes e-mail (lower-cased, trimmed)
@@ -192,6 +194,47 @@ public class ClubConnectDbContext : DbContext
             entity.HasIndex(a => new { a.EventId, a.MemberId })
                 .IsUnique()
                 .HasDatabaseName("IX_ClubEventAttendees_EventId_MemberId");
+        });
+
+        modelBuilder.Entity<ClubTask>(entity =>
+        {
+            entity.ToTable("ClubTasks");
+
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Title)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(t => t.Description)
+                .HasMaxLength(1000);
+
+            // Stored as text ("ToDo", "InProgress", "Done") so the column stays readable.
+            entity.Property(t => t.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(t => t.CreatedAtUtc)
+                .IsRequired();
+
+            entity.HasOne(t => t.Club)
+                .WithMany(c => c.Tasks)
+                .HasForeignKey(t => t.ClubId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(t => t.Assignee)
+                .WithMany()
+                .HasForeignKey(t => t.AssigneeMemberId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(t => t.CreatedByMember)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(t => new { t.ClubId, t.Status })
+                .HasDatabaseName("IX_ClubTasks_ClubId_Status");
         });
     }
 }

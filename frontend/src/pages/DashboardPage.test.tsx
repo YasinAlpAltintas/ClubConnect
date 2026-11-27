@@ -13,6 +13,7 @@ vi.mock('../lib/api', async () => {
     getClubDetails: vi.fn(),
     getClubMembers: vi.fn(),
     getClubEvents: vi.fn(),
+    getClubTasks: vi.fn(),
   }
 })
 
@@ -357,6 +358,59 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByTestId('dashboard-club-name')).toHaveTextContent('Leuven Robotics Club')
     expect(window.location.hash).toBe('#dashboard/club-alpha')
+  })
+
+  it('navigates to the Kanban task board and back (INC-27)', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getClubTasks).mockResolvedValue([
+      {
+        id: 'task-1',
+        clubId: 'club-alpha',
+        title: 'Prepare robot demo',
+        description: null,
+        status: 'in_progress',
+        assigneeMemberId: null,
+        assigneeDisplayName: null,
+        createdAtUtc: '2026-11-01T10:00:00Z',
+      },
+    ])
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubAdmin],
+      initialActiveClubId: 'club-alpha',
+    })
+
+    await user.click(await screen.findByTestId('dashboard-tasks-btn'))
+
+    expect(await screen.findByTestId('tasks-page-heading')).toHaveTextContent(/Task Board|Takenbord/i)
+    expect(window.location.hash).toBe('#dashboard/club-alpha/tasks')
+    expect(api.getClubTasks).toHaveBeenCalledWith('club-alpha', dummyMember.token)
+    expect(await screen.findByText('Prepare robot demo')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('tasks-back-to-dashboard-link'))
+
+    expect(await screen.findByTestId('dashboard-club-name')).toHaveTextContent('Leuven Robotics Club')
+    expect(window.location.hash).toBe('#dashboard/club-alpha')
+  })
+
+  it('lets a regular Club Member open the task board from the URL', async () => {
+    window.location.hash = '#dashboard/club-beta/tasks'
+    vi.mocked(api.getClubDetails).mockResolvedValue(dummyClubMember)
+    vi.mocked(api.getClubTasks).mockResolvedValue([])
+
+    renderDashboardPage({
+      member: dummyMember,
+      onLogout: vi.fn(),
+      onNavigateToLobby: vi.fn(),
+      initialClubs: [dummyClubMember],
+      initialActiveClubId: dummyClubMember.id,
+    })
+
+    expect(await screen.findByTestId('kanban-empty-board')).toBeInTheDocument()
+    expect(screen.getByTestId('kanban-column-todo')).toBeInTheDocument()
   })
 
   it('allows regular Club Member to view calendar without access denied', async () => {

@@ -430,6 +430,41 @@ export async function getClubEvents(
   return (await res.json()) as ClubEventDto[]
 }
 
+export type ClubTaskStatus = 'todo' | 'in_progress' | 'done'
+
+export interface ClubTaskDto {
+  id: string
+  clubId: string
+  title: string
+  description?: string | null
+  status: ClubTaskStatus
+  assigneeMemberId?: string | null
+  assigneeDisplayName?: string | null
+  createdAtUtc: string
+}
+
+export async function getClubTasks(
+  clubId: string,
+  token?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ClubTaskDto[]> {
+  const res = await fetchFn(`/api/clubs/${clubId}/tasks`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+
+  if (!res.ok) {
+    const error = new Error(`Failed to fetch club tasks (${res.status})`) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+
+  return (await res.json()) as ClubTaskDto[]
+}
+
 export interface CreateClubRequest {
   name: string
   description?: string

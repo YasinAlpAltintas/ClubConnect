@@ -150,6 +150,50 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.ToTable("ClubInvites", (string)null);
                 });
 
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssigneeMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClubId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssigneeMemberId");
+
+                    b.HasIndex("CreatedByMemberId");
+
+                    b.HasIndex("ClubId", "Status")
+                        .HasDatabaseName("IX_ClubTasks_ClubId_Status");
+
+                    b.ToTable("ClubTasks", (string)null);
+                });
+
             modelBuilder.Entity("ClubConnect.Domain.Entities.Member", b =>
                 {
                     b.Property<Guid>("Id")
@@ -263,6 +307,32 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.Navigation("Club");
                 });
 
+            modelBuilder.Entity("ClubConnect.Domain.Entities.ClubTask", b =>
+                {
+                    b.HasOne("ClubConnect.Domain.Entities.Member", "Assignee")
+                        .WithMany()
+                        .HasForeignKey("AssigneeMemberId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClubConnect.Domain.Entities.Club", "Club")
+                        .WithMany("Tasks")
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClubConnect.Domain.Entities.Member", "CreatedByMember")
+                        .WithMany()
+                        .HasForeignKey("CreatedByMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Assignee");
+
+                    b.Navigation("Club");
+
+                    b.Navigation("CreatedByMember");
+                });
+
             modelBuilder.Entity("ClubConnect.Domain.Entities.Membership", b =>
                 {
                     b.HasOne("ClubConnect.Domain.Entities.Club", "Club")
@@ -289,6 +359,8 @@ namespace ClubConnect.Infrastructure.Persistence.Migrations
                     b.Navigation("Invites");
 
                     b.Navigation("Memberships");
+
+                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("ClubConnect.Domain.Entities.ClubEvent", b =>
